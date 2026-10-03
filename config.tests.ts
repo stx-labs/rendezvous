@@ -213,6 +213,25 @@ describe("Config loading and validation", () => {
       ),
     ).toThrow(`"fail_on_unchecked" must be a boolean.`);
   });
+
+  it("reads snapshot as a boolean", () => {
+    // Arrange
+    const valid = createTempConfigFile(
+      "snapshot",
+      JSON.stringify({ snapshot: true }),
+    );
+    const invalid = createTempConfigFile(
+      "snapshot-string",
+      JSON.stringify({ snapshot: "yes" }),
+    );
+
+    // Act & Assert
+    expect(loadConfig(valid)).toEqual({
+      config: { snapshot: true },
+      unknownKeys: [],
+    });
+    expect(() => loadConfig(invalid)).toThrow(`"snapshot" must be a boolean.`);
+  });
 });
 
 describe("Account resolution", () => {

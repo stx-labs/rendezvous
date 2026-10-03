@@ -66,6 +66,22 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
   throws; these only warn by default.
 - `--dial` – The path to a JavaScript file containing custom pre- and
   post-execution functions (dialers).
+- `--snapshot` – After a failure, report the target contract's data variables
+  before each call of the failing run (opt-in).
+
+---
+
+### Contract state on failure (opt-in)
+
+```bash
+rv example counter invariant --snapshot
+```
+
+When a run fails, `--snapshot` resets the simnet session, replays the same
+seed up to the first failing run, and prints the target contract's data
+variables before each call of that run. Passing runs do no extra work. Maps,
+constants and token balances are not included. The config file key is
+`snapshot`.
 
 ---
 

@@ -274,4 +274,45 @@ describe("CLI parsing with parseCli", () => {
     const config = parseCli(["./example", "counter", "test", "--seed=42"])!;
     expect(config.warnings).toEqual([]);
   });
+
+  it("keeps snapshots disabled unless --snapshot is passed", () => {
+    expect(parseCli(["./example", "counter", "test"])!.snapshot).toBe(false);
+    expect(
+      parseCli(["./example", "counter", "test", "--snapshot"])!.snapshot,
+    ).toBe(true);
+  });
+
+  it("takes snapshot only from the config when --config is provided", () => {
+    // Arrange
+    const tempDir = join(tmpdir(), "rendezvous-test-parsecli-snapshot");
+    mkdirSync(tempDir, { recursive: true });
+    const configPath = join(tempDir, "rv.config.json");
+    writeFileSync(configPath, JSON.stringify({ snapshot: true }), "utf-8");
+
+    // Act
+    const fromConfig = parseCli([
+      "./example",
+      "counter",
+      "test",
+      `--config=${configPath}`,
+    ])!;
+    writeFileSync(configPath, JSON.stringify({}), "utf-8");
+    const ignored = parseCli([
+      "./example",
+      "counter",
+      "test",
+      `--config=${configPath}`,
+      "--snapshot",
+    ])!;
+
+    // Assert
+    expect(fromConfig.snapshot).toBe(true);
+    expect(ignored.snapshot).toBe(false);
+    expect(ignored.warnings).toEqual([
+      "Warning: --snapshot ignored when --config is used.",
+    ]);
+
+    // Teardown
+    rmSync(tempDir, { recursive: true, force: true });
+  });
 });

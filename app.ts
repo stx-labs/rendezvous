@@ -14,7 +14,7 @@ import {
 } from "./cli";
 import { red, yellow } from "./colors";
 import { resolveAccounts } from "./config";
-import { CoverageTracker } from "./coverage";
+import { CoverageTracker, reportAfterRun } from "./coverage";
 import { checkInvariants } from "./invariant";
 import { checkProperties } from "./property";
 import {
@@ -152,8 +152,52 @@ export const main = async () => {
     ),
   );
 
+  const reportCoverage = (tracker: CoverageTracker) => {
+    tracker.collect(simnet);
+    const report = tracker.summary();
+    radio.emit(
+      "logMessage",
+      `Coverage: ${report.lines.hit}/${report.lines.total} lines, ` +
+        `${report.branches.hit}/${report.branches.total} branches ` +
+        `in ${(report.elapsedMs / 1000).toFixed(3)} s.`,
+    );
+    // Totals include every project contract, so also list the files the
+    // run reached.
+    for (const file of report.files) {
+      if (file.lines.hit > 0 || file.branches.hit > 0) {
+        radio.emit(
+          "logMessage",
+          `  ${relative(runConfig.manifestDir, file.file)}: ` +
+            `${file.lines.hit}/${file.lines.total} lines, ` +
+            `${file.branches.hit}/${file.branches.total} branches`,
+        );
+      }
+    }
+    if (runConfig.coverageJson) {
+      writeFileSync(
+        runConfig.coverageJson,
+        JSON.stringify(
+          {
+            version: 1,
+            manifestPath: resolve(manifestPath),
+            contract: runConfig.sutContractName,
+            type: runConfig.type,
+            seed: runConfig.seed,
+            requestedRuns: runConfig.runs,
+            ...report,
+          },
+          null,
+          2,
+        ) + "\n",
+      );
+    }
+    if (runConfig.coverageLcov) {
+      writeFileSync(runConfig.coverageLcov, tracker.toLcov());
+    }
+  };
+
   // Select the testing routine based on `type`.
-  try {
+  const run = async () => {
     switch (runConfig.type) {
       case "invariant": {
         await checkInvariants(
@@ -190,50 +234,12 @@ export const main = async () => {
         break;
       }
     }
-  } finally {
-    if (coverage) {
-      coverage.collect(simnet);
-      const report = coverage.summary();
-      radio.emit(
-        "logMessage",
-        `Coverage: ${report.lines.hit}/${report.lines.total} lines, ` +
-          `${report.branches.hit}/${report.branches.total} branches ` +
-          `in ${(report.elapsedMs / 1000).toFixed(3)} s.`,
-      );
-      // Totals include every project contract, so also list the files the
-      // run reached.
-      for (const file of report.files) {
-        if (file.lines.hit > 0 || file.branches.hit > 0) {
-          radio.emit(
-            "logMessage",
-            `  ${relative(runConfig.manifestDir, file.file)}: ` +
-              `${file.lines.hit}/${file.lines.total} lines, ` +
-              `${file.branches.hit}/${file.branches.total} branches`,
-          );
-        }
-      }
-      if (runConfig.coverageJson) {
-        writeFileSync(
-          runConfig.coverageJson,
-          JSON.stringify(
-            {
-              version: 1,
-              manifestPath: resolve(manifestPath),
-              contract: runConfig.sutContractName,
-              type: runConfig.type,
-              seed: runConfig.seed,
-              requestedRuns: runConfig.runs,
-              ...report,
-            },
-            null,
-            2,
-          ) + "\n",
-        );
-      }
-      if (runConfig.coverageLcov) {
-        writeFileSync(runConfig.coverageLcov, coverage.toLcov());
-      }
-    }
+  };
+
+  if (coverage) {
+    await reportAfterRun(run, () => reportCoverage(coverage), radio);
+  } else {
+    await run();
   }
 
   if (unchecked) {

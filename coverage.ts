@@ -143,24 +143,31 @@ export class CoverageTracker {
     return novel;
   }
 
-  /** collectReport drains coverage; preserve every delta before a reset. */
+  /**
+   * collectReport drains coverage; preserve every delta before a reset.
+   * Increases are recorded here, so hits drained before a session reset are
+   * not lost from the curve. Storing increases only bounds the curve size by
+   * the coverage identities.
+   */
   collect(simnet: Pick<Simnet, "collectReport">): string[] {
     const report = simnet.collectReport(false, "");
+    let novel: string[] = [];
     try {
-      return this.ingest(report.coverage);
+      novel = this.ingest(report.coverage);
     } finally {
       report.free();
     }
+    if (novel.length > 0) {
+      this.curve.push(this.point());
+    }
+    return novel;
   }
 
-  /**
-   * Sample after a completed candidate, including failures and shrinking.
-   * Store increases only, bounding curve size by the coverage identities.
-   */
+  /** Sample after a completed candidate, including failures and shrinking. */
   sample(simnet: Pick<Simnet, "collectReport">): string[] {
     this.evaluations++;
     const novel = this.collect(simnet);
-    if (novel.length > 0 || this.curve.length === 0) {
+    if (this.curve.length === 0) {
       this.curve.push(this.point());
     }
     return novel;
@@ -228,3 +235,37 @@ export class CoverageTracker {
     return records.length > 0 ? records.join("\n") + "\n" : "";
   }
 }
+
+/**
+ * Runs the selected routine, then reports coverage. A reporting error never
+ * replaces the routine's own error: it is logged and the routine's error is
+ * rethrown.
+ */
+export const reportAfterRun = async (
+  run: () => Promise<void>,
+  report: () => void,
+  radio: EventEmitter,
+): Promise<void> => {
+  let runFailed = false;
+  let runError: unknown = undefined;
+  try {
+    await run();
+  } catch (error) {
+    runFailed = true;
+    runError = error;
+  }
+  try {
+    report();
+  } catch (error) {
+    if (!runFailed) {
+      throw error;
+    }
+    radio.emit(
+      "logFailure",
+      `\nCoverage report failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (runFailed) {
+    throw runError;
+  }
+};

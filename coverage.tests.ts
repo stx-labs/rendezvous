@@ -6,7 +6,11 @@ import { getSDK, initSimnet } from "@stacks/clarinet-sdk";
 import fc from "fast-check";
 
 import { main } from "./app";
-import { CoverageTracker, observedAsyncProperty } from "./coverage";
+import {
+  CoverageTracker,
+  observedAsyncProperty,
+  reportAfterRun,
+} from "./coverage";
 import { createIsolatedTestEnvironment } from "./test.utils";
 
 const record = (file: string, rows: string[]) =>
@@ -124,6 +128,33 @@ describe("LCOV aggregation", () => {
     expect(simnet.collectReport).toHaveBeenCalledWith(false, "");
   });
 
+  it("records increases drained before a session reset in the curve", () => {
+    let now = 100;
+    const tracker = new CoverageTracker(() => now);
+    const reports = [
+      record("a.clar", ["DA:1,1", "DA:2,0"]),
+      record("a.clar", ["DA:2,1"]),
+      "",
+    ];
+    const free = vi.fn();
+    const sdk = {
+      collectReport: vi.fn(() => ({ coverage: reports.shift()!, free })),
+    } as unknown as Parameters<typeof tracker.sample>[0];
+    now = 110;
+    tracker.sample(sdk);
+    // A session reset drains the SDK report between two samples.
+    now = 120;
+    tracker.collect(sdk);
+    now = 130;
+    tracker.sample(sdk);
+    now = 140;
+    const summary = tracker.summary();
+    expect(summary.curve.map((p) => p.elapsedMs)).toEqual([10, 20, 40]);
+    expect(summary.curve.map((p) => p.lines.hit)).toEqual([1, 2, 2]);
+    expect(summary.lastIncreaseMs).toBe(20);
+    expect(summary.evaluations).toBe(2);
+  });
+
   it("round trips LCOV including never-taken branches", () => {
     const tracker = new CoverageTracker();
     tracker.ingest(record("a.clar", ["DA:1,0", "BRDA:1,0,0,-"]));
@@ -216,6 +247,64 @@ describe("SDK coverage reports", () => {
     expect(tracker.summary().lines.hit).toBeGreaterThan(before);
     // The SDK session is a Proxy; let its target's finalizer release it.
     rmSync(project, { recursive: true, force: true });
+  });
+});
+
+describe("Coverage report after a run", () => {
+  const failures = () => {
+    const radio = new EventEmitter();
+    const logged: string[] = [];
+    radio.on("logFailure", (message) => logged.push(String(message)));
+    return { radio, logged };
+  };
+
+  it("keeps the run's error when the report also fails", async () => {
+    const { radio, logged } = failures();
+    const runError = new Error("run failed");
+    await expect(
+      reportAfterRun(
+        async () => {
+          throw runError;
+        },
+        () => {
+          throw new Error("disk full");
+        },
+        radio,
+      ),
+    ).rejects.toBe(runError);
+    expect(logged).toEqual(["\nCoverage report failed: disk full"]);
+  });
+
+  it("reports coverage after a failed run", async () => {
+    const { radio, logged } = failures();
+    const report = vi.fn();
+    const runError = new Error("run failed");
+    await expect(
+      reportAfterRun(
+        async () => {
+          throw runError;
+        },
+        report,
+        radio,
+      ),
+    ).rejects.toBe(runError);
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(logged).toEqual([]);
+  });
+
+  it("surfaces a report error after a successful run", async () => {
+    const { radio, logged } = failures();
+    const reportError = new Error("disk full");
+    await expect(
+      reportAfterRun(
+        async () => {},
+        () => {
+          throw reportError;
+        },
+        radio,
+      ),
+    ).rejects.toBe(reportError);
+    expect(logged).toEqual([]);
   });
 });
 

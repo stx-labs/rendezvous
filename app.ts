@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { EventEmitter } from "node:events";
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 
@@ -14,6 +14,7 @@ import {
 } from "./cli";
 import { red, yellow } from "./colors";
 import { resolveAccounts } from "./config";
+import { CoverageTracker } from "./coverage";
 import { checkInvariants } from "./invariant";
 import { checkProperties } from "./property";
 import {
@@ -96,7 +97,19 @@ export const main = async () => {
 
   logRunConfig(radio, runConfig, manifestPath);
 
-  const simnet = await initSimnet(manifestPath);
+  // SDK options apply when the instance is created; bypass the cache only
+  // when coverage is explicitly enabled. Default initialization is unchanged.
+  const simnet = runConfig.coverage
+    ? await initSimnet(manifestPath, true, {
+        trackCosts: false,
+        trackCoverage: true,
+      })
+    : await initSimnet(manifestPath);
+  const coverage = runConfig.coverage ? new CoverageTracker() : undefined;
+  coverage?.collect(simnet);
+  if (runConfig.coverageJson) {
+    radio.on("runComplete", () => coverage!.sample(simnet));
+  }
 
   const { eligibleAccounts, allAddresses } = resolveAccounts(
     simnet.getAccounts(),
@@ -105,6 +118,7 @@ export const main = async () => {
   );
 
   const resetSession = async () => {
+    coverage?.collect(simnet);
     await initSimnet(manifestPath);
     radio.emit("logMessage", "Simnet session reset.");
   };
@@ -139,40 +153,86 @@ export const main = async () => {
   );
 
   // Select the testing routine based on `type`.
-  switch (runConfig.type) {
-    case "invariant": {
-      await checkInvariants(
-        simnet,
-        resetSession,
-        rendezvousList,
-        rendezvousAllFunctions,
-        runConfig.seed,
-        runConfig.runs,
-        runConfig.dial,
-        runConfig.bail,
-        runConfig.regr,
-        radio,
-        eligibleAccounts,
-        allAddresses,
-      );
-      break;
-    }
+  try {
+    switch (runConfig.type) {
+      case "invariant": {
+        await checkInvariants(
+          simnet,
+          resetSession,
+          rendezvousList,
+          rendezvousAllFunctions,
+          runConfig.seed,
+          runConfig.runs,
+          runConfig.dial,
+          runConfig.bail,
+          runConfig.regr,
+          radio,
+          eligibleAccounts,
+          allAddresses,
+        );
+        break;
+      }
 
-    case "test": {
-      await checkProperties(
-        simnet,
-        resetSession,
-        rendezvousList,
-        rendezvousAllFunctions,
-        runConfig.seed,
-        runConfig.runs,
-        runConfig.bail,
-        runConfig.regr,
-        radio,
-        eligibleAccounts,
-        allAddresses,
+      case "test": {
+        await checkProperties(
+          simnet,
+          resetSession,
+          rendezvousList,
+          rendezvousAllFunctions,
+          runConfig.seed,
+          runConfig.runs,
+          runConfig.bail,
+          runConfig.regr,
+          radio,
+          eligibleAccounts,
+          allAddresses,
+        );
+        break;
+      }
+    }
+  } finally {
+    if (coverage) {
+      coverage.collect(simnet);
+      const report = coverage.summary();
+      radio.emit(
+        "logMessage",
+        `Coverage: ${report.lines.hit}/${report.lines.total} lines, ` +
+          `${report.branches.hit}/${report.branches.total} branches ` +
+          `in ${(report.elapsedMs / 1000).toFixed(3)} s.`,
       );
-      break;
+      // Totals include every project contract, so also list the files the
+      // run reached.
+      for (const file of report.files) {
+        if (file.lines.hit > 0 || file.branches.hit > 0) {
+          radio.emit(
+            "logMessage",
+            `  ${relative(runConfig.manifestDir, file.file)}: ` +
+              `${file.lines.hit}/${file.lines.total} lines, ` +
+              `${file.branches.hit}/${file.branches.total} branches`,
+          );
+        }
+      }
+      if (runConfig.coverageJson) {
+        writeFileSync(
+          runConfig.coverageJson,
+          JSON.stringify(
+            {
+              version: 1,
+              manifestPath: resolve(manifestPath),
+              contract: runConfig.sutContractName,
+              type: runConfig.type,
+              seed: runConfig.seed,
+              requestedRuns: runConfig.runs,
+              ...report,
+            },
+            null,
+            2,
+          ) + "\n",
+        );
+      }
+      if (runConfig.coverageLcov) {
+        writeFileSync(runConfig.coverageLcov, coverage.toLcov());
+      }
     }
   }
 

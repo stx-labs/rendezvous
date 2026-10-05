@@ -56,6 +56,9 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
 - `--seed` – The seed to use for the replay functionality.
 - `--runs` – The number of test iterations to use for exercising the contracts.
   (default: `100`)
+- `--coverage` – Report line and branch coverage (opt-in).
+- `--coverage-json` – Save coverage totals and a timed coverage curve.
+- `--coverage-lcov` – Save merged line and branch LCOV.
 - `--regr` – Run regression tests only (replay saved failures).
 - `--bail` – Stop after the first failure.
 - `--fail-on-unchecked` – Fail the run (exit code 1) if a test or invariant was
@@ -66,6 +69,33 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
   throws; these only warn by default.
 - `--dial` – The path to a JavaScript file containing custom pre- and
   post-execution functions (dialers).
+
+---
+
+### Coverage (opt-in)
+
+```bash
+rv example counter invariant --runs=1000 --seed=42 --coverage \
+  --coverage-json=coverage.json --coverage-lcov=coverage.lcov
+```
+
+`--coverage` enables Clarinet SDK coverage tracking and prints line and
+branch totals at the end of the run, then the counts for each file the run
+reached. Totals include the project's Clarity
+sources, test functions and called contracts, but not boot contracts. Only
+positive hit counts are covered. Without `--coverage`, tracking stays
+disabled and the generated calls and output are unchanged.
+
+- `--coverage-json` saves overall and per-file totals, plus a curve of the
+  points where coverage increased. It collects coverage after every run,
+  including discarded, failing and shrinking runs, which adds overhead.
+- `--coverage-lcov` saves merged line and branch LCOV records.
+
+Both output flags require `--coverage`. The config file keys are
+`coverage`, `coverage_json` and `coverage_lcov`.
+
+Coverage shows which code ran. It does not show that a property or an
+invariant checks that code correctly.
 
 ---
 

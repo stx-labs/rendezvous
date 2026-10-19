@@ -414,6 +414,22 @@ describe("CLI coverage", () => {
         const replay = new CoverageTracker();
         replay.ingest(readFileSync(lcovPath, "utf8"));
         expect(replay.summary().files).toEqual(report.files);
+
+        // A later default invocation must reuse the untracked SDK instance.
+        logs.length = 0;
+        writeFileSync(configPath, JSON.stringify(config));
+        await main();
+        expect(logs.filter((line) => line.startsWith("₿"))).toEqual(stock);
+        expect(logs.some((line) => line.startsWith("Coverage:"))).toBe(false);
+        const ordinary = await initSimnet(join(project, "Clarinet.toml"));
+        ordinary.callPublicFn("counter", "increment", [], ordinary.deployer);
+        const drained = ordinary.collectReport(false, "");
+        try {
+          expect(drained.coverage).toBe("");
+        } finally {
+          drained.free();
+        }
+        expect(ordinary).toBe(initial);
       } finally {
         process.argv = initialArgv;
         log.mockRestore();

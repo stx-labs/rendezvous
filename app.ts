@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { initSimnet } from "@stacks/clarinet-sdk";
+import { getSDK, initSimnet } from "@stacks/clarinet-sdk";
 
 import {
   helpMessage,
@@ -97,14 +97,13 @@ export const main = async () => {
 
   logRunConfig(radio, runConfig, manifestPath);
 
-  // SDK options apply when the instance is created; bypass the cache only
-  // when coverage is explicitly enabled. Default initialization is unchanged.
+  // Keep tracking options out of initSimnet's memoized default instance.
   const simnet = runConfig.coverage
-    ? await initSimnet(manifestPath, true, {
-        trackCosts: false,
-        trackCoverage: true,
-      })
+    ? await getSDK({ trackCosts: false, trackCoverage: true })
     : await initSimnet(manifestPath);
+  if (runConfig.coverage) {
+    await simnet.initSession(process.cwd(), manifestPath, null);
+  }
   const coverage = runConfig.coverage ? new CoverageTracker() : undefined;
   coverage?.collect(simnet);
   if (runConfig.coverageJson) {
@@ -119,7 +118,11 @@ export const main = async () => {
 
   const resetSession = async () => {
     coverage?.collect(simnet);
-    await initSimnet(manifestPath);
+    if (coverage) {
+      await simnet.initSession(process.cwd(), manifestPath, null);
+    } else {
+      await initSimnet(manifestPath);
+    }
     radio.emit("logMessage", "Simnet session reset.");
   };
 

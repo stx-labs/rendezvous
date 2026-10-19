@@ -221,6 +221,7 @@ export const checkProperties = async (
         (replayRadio, recorder) =>
           propertyTest({
             ...config,
+            seed: runDetails.seed,
             bail: true,
             radio: replayRadio,
             recorder,

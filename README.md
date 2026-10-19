@@ -69,19 +69,11 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
 - `--snapshot` – After a failure, report the target contract's data variables
   before each call of the failing run (opt-in).
 
----
-
-### Contract state on failure (opt-in)
-
-```bash
-rv example counter invariant --snapshot
-```
-
-When a run fails, `--snapshot` resets the simnet session, replays the same
-seed up to the first failing run, and prints the target contract's data
-variables before each call of that run. Passing runs do no extra work. Maps,
-constants and token balances are not included. The config file key is
-`snapshot`.
+Use `rv example counter invariant --snapshot` to reset simnet and replay
+its captured seed up to the first failing run as it was before shrinking.
+It prints the target contract's data variables before each call. Passing
+runs do no extra replay. Maps, constants, token balances, and other
+contracts are excluded. Set `"snapshot": true` in config.
 
 ---
 

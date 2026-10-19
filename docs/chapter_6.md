@@ -404,32 +404,20 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 
 **7. Reporting the Contract State Before a Failure**
 
-To see the contract state that led to a failure, use `--snapshot`:
+Use `rv root contract invariant --snapshot` (`"snapshot": true` in config) to
+reset simnet and replay the captured seed up to the first failing run.
+Snapshots show the target contract's `define-data-var` values and block
+heights before calls. Property tests record the failing test call;
+invariant tests record each public call and the invariant check.
 
-```bash
-rv root contract invariant --snapshot
-```
+Passing runs are not replayed. Maps, constants, token balances, and other
+contracts are excluded. Snapshots describe the first failure before
+shrinking; use `--bail` to keep the ordinary failure report on that run.
+If replay passes or fails at a different run, no state is shown.
 
-When a run fails, Rendezvous resets the simnet session and replays the same seed up to the first failing run. It then prints the target contract's data variables before each call of that run:
-
-```
-Replaying seed 1 up to run 5 to report the state before the first failure...
-Simnet session reset.
-
-Contract state before each call of run 5, the first failing run (contract data variables only):
-
-₿       12 Ӿ       16   before test-below-limit
-  counter: u4
-  flag: false
-```
-
-For property-based tests, the state is read right before the failing test function is called. For invariant tests, it is read before each public function call of the failing run and before the invariant check, so you can follow how the state changed.
-
-Passing runs do no extra work; the replay only happens after a failure. Some details to keep in mind:
-
-- Only data variables (`define-data-var`) of the target contract are shown. Maps, constants, token balances and other contracts are not.
-- The state comes from the first failing run, before shrinking. With `--bail`, this is the run in the failure report. Without it, the reported counterexample may be a shrunk version of that run.
-- If the replay does not fail at the same run, for example because a dialer behaves differently, Rendezvous says so and reports no state.
+Dialers must be deterministic; equal failure run numbers do not prove
+identical execution. Snapshot errors remain secondary to the original
+failure. Replay does not save another failure.
 
 ### Summary
 

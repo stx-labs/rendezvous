@@ -13,10 +13,16 @@ import { stripVTControlCharacters } from "node:util";
 
 import type { Simnet } from "@stacks/clarinet-sdk";
 import { Cl } from "@stacks/transactions";
+import fc from "fast-check";
 
 import { main } from "./app";
 import type { RunDetails } from "./heatstroke.types";
 import { reportStateBeforeFailure, StateRecorder } from "./snapshot";
+
+vi.mock("fast-check", async (importOriginal) => {
+  const actual = await importOriginal<{ default: typeof fc }>();
+  return { ...actual, default: { ...actual.default } };
+});
 
 const isolatedTestEnvPrefix = "rendezvous-test-snapshot-";
 
@@ -244,6 +250,33 @@ epoch = 3.0
     rmSync(project, { recursive: true, force: true });
   });
 
+  it.each(["test", "invariant"])(
+    "replays the generated failure seed for %s",
+    async (type) => {
+      const seeds: number[] = [];
+      const requested: (number | undefined)[] = [];
+      const originalAssert = fc.assert;
+      vi.spyOn(fc, "assert").mockImplementation(async (property, options) => {
+        requested.push(options?.seed);
+        await originalAssert(property, {
+          ...options,
+          asyncReporter: async (details) => {
+            seeds.push(details.seed);
+            await options!.reporter!(details);
+          },
+          reporter: undefined,
+        });
+      });
+
+      const output = await run([type, "--runs=10", "--bail", "--snapshot"]);
+
+      expect(requested).toEqual([undefined, seeds[0]]);
+      expect(seeds).toEqual([seeds[0], seeds[0]]);
+      expect(output).toContain("Contract state before each call");
+      expect(process.exitCode).toBe(1);
+    },
+  );
+
   it("reports the state before the failing property call", async () => {
     // Act
     const output = await run(["test", "--seed=1", "--snapshot"]);
@@ -277,7 +310,7 @@ epoch = 3.0
     expect(regressions.test).toHaveLength(1);
   });
 
-  it("reports the state before each call of the failing invariant run", async () => {
+  it("reports state before calls in the failing invariant run", async () => {
     // Act
     const output = await run(["invariant", "--seed=1", "--snapshot"]);
 

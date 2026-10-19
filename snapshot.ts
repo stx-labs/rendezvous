@@ -78,7 +78,10 @@ export const reportStateBeforeFailure = async (
   runDetails: RunDetails,
   contractId: string,
   resetSession: () => Promise<void>,
-  replay: (radio: EventEmitter, recorder: StateRecorder) => Promise<RunDetails>,
+  replay: (
+    replayRadio: EventEmitter,
+    recorder: StateRecorder,
+  ) => Promise<RunDetails>,
   radio: EventEmitter,
 ) => {
   if (!runDetails.failed) {
@@ -91,11 +94,19 @@ export const reportStateBeforeFailure = async (
     `Replaying seed ${seed} up to run ${numRuns} to report the state ` +
       `before the first failure...`,
   );
-  await resetSession();
-
   const recorder = new StateRecorder(numRuns);
-  // The replay output is not shown; only its recorded state is reported.
-  const replayed = await replay(new EventEmitter(), recorder);
+  let replayed: RunDetails | undefined = undefined;
+  try {
+    await resetSession();
+    // The replay output is not shown; only its recorded state is reported.
+    replayed = await replay(new EventEmitter(), recorder);
+  } catch (error: unknown) {
+    radio.emit(
+      "logFailure",
+      `Could not replay the failure for a state snapshot: ${String(error)}\n`,
+    );
+    return;
+  }
 
   if (recorder.error !== undefined) {
     radio.emit(

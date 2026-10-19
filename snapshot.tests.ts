@@ -145,6 +145,31 @@ describe("Reporting the state before a failure", () => {
     expect(logs.some((log) => log.includes("counter: u7"))).toBe(false);
   });
 
+  it.each(["reset", "replay"])(
+    "keeps a snapshot %s rejection secondary",
+    async (operation) => {
+      const { logs, radio } = captureLogs();
+      const failure = new Error(`${operation} failed`);
+      const reject = vi.fn(async () => {
+        throw failure;
+      });
+      await expect(
+        reportStateBeforeFailure(
+          failedRun(1),
+          "ST1.contract",
+          operation === "reset" ? reject : async () => {},
+          reject,
+          radio,
+        ),
+      ).resolves.toBeUndefined();
+      expect(logs).toContain(
+        `Could not replay the failure for a state snapshot: ${failure}\n`,
+      );
+      expect(logs.join("\n")).not.toContain("Contract state before");
+      expect(reject).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("reports a read error instead of the state", async () => {
     // Arrange
     const { logs, radio } = captureLogs();

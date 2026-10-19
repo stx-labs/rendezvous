@@ -396,9 +396,9 @@ A config file is a JSON object with optional fields:
 | `regr`              | boolean          | Run regression tests only.                              |
 | `dial`              | string           | Path to custom dialers file.                            |
 | `fail_on_unchecked` | boolean          | Fail the run when a test or invariant goes unchecked.   |
-| `coverage`      | boolean          | Report line and branch coverage.                        |
-| `coverage_json` | string           | Save coverage totals and curve as JSON.                 |
-| `coverage_lcov` | string           | Save merged line and branch LCOV.                       |
+
+Set `coverage` to `true` to report coverage. Use `coverage_json` and
+`coverage_lcov` for JSON and LCOV output paths; both require `coverage`.
 
 The `accounts` field lets you define custom accounts for testing. By default (`"overwrite"` mode), these replace the Devnet.toml accounts entirely. With `"concatenate"` mode, config accounts are merged with the existing Devnet accounts — if a name appears in both, the config account's address takes precedence.
 
@@ -420,9 +420,11 @@ Coverage: 19/831 lines, 3/257 branches in 0.833 s.
   contracts/counter.clar: 19/34 lines, 3/8 branches
 ```
 
-The totals include the project's contracts, test functions and
-called contracts, but not boot contracts. Without `--coverage`, coverage
-tracking stays disabled.
+Totals include project sources, including local test functions and other
+local project contracts. The verified SDK report excludes boot and imported
+mainnet requirement sources, even when a test calls those requirements.
+Only positive line and branch hit counts are covered. Coverage tracking is
+opt-in; ordinary default invocations leave it disabled.
 
 To keep the results, add `--coverage-lcov` for merged LCOV records, or
 `--coverage-json` for per-file totals and a curve of coverage increases:
@@ -432,9 +434,10 @@ rv root contract invariant --coverage \
   --coverage-lcov=coverage.lcov --coverage-json=coverage.json
 ```
 
-`--coverage-json` collects coverage after every run, so it is slower than
-`--coverage` alone. Coverage shows which code ran, not whether a property
-or invariant checks it correctly.
+`--coverage-json` collects after every candidate, including discards,
+failures, and shrinking candidates, which adds overhead. Its `evaluations`
+count includes those candidates. Coverage shows which code ran, not
+whether a property or invariant checks it correctly.
 
 ### Summary
 
@@ -461,6 +464,10 @@ Rendezvous colors its output only when writing to a terminal, so redirected or p
 ```bash
 FORCE_COLOR=1 rv root contract test
 ```
+
+`--coverage` reports line and branch coverage. With it, use
+`--coverage-json=<file>` to save totals and a timed curve, or
+`--coverage-lcov=<file>` to save merged LCOV.
 
 ---
 

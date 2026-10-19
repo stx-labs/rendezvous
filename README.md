@@ -79,23 +79,8 @@ rv example counter invariant --runs=1000 --seed=42 --coverage \
   --coverage-json=coverage.json --coverage-lcov=coverage.lcov
 ```
 
-`--coverage` enables Clarinet SDK coverage tracking and prints line and
-branch totals at the end of the run, then the counts for each file the run
-reached. Totals include the project's Clarity
-sources, test functions and called contracts, but not boot contracts. Only
-positive hit counts are covered. Without `--coverage`, tracking stays
-disabled and the generated calls and output are unchanged.
-
-- `--coverage-json` saves overall and per-file totals, plus a curve of the
-  points where coverage increased. It collects coverage after every run,
-  including discarded, failing and shrinking runs, which adds overhead.
-- `--coverage-lcov` saves merged line and branch LCOV records.
-
-Both output flags require `--coverage`. The config file keys are
-`coverage`, `coverage_json` and `coverage_lcov`.
-
-Coverage shows which code ran. It does not show that a property or an
-invariant checks that code correctly.
+`--coverage` reports line and branch coverage of project sources; see the
+[coverage reference](docs/chapter_6.md) for scope and output details.
 
 ---
 

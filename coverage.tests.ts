@@ -306,6 +306,39 @@ describe("Coverage report after a run", () => {
     ).rejects.toBe(reportError);
     expect(logged).toEqual([]);
   });
+
+  it.each([false, true])(
+    "defers collector errors outside the predicate (failing=%s)",
+    async (failing) => {
+      const radio = new EventEmitter();
+      const tracker = new CoverageTracker();
+      const runError = new Error("original contract failure");
+      const collectionError = new Error("coverage collection failed");
+      const collectReport = vi.fn(() => {
+        throw collectionError;
+      });
+      const sdk = { collectReport };
+      radio.on("runComplete", () => tracker.sample(sdk));
+      const run = async () => {
+        const result = await fc.check(
+          observedAsyncProperty(radio)(fc.integer(), async () => {
+            if (failing) {
+              throw runError;
+            }
+          }),
+          { seed: 42, numRuns: 3 },
+        );
+        expect(result.failed).toBe(failing);
+        if (result.failed) {
+          throw result.errorInstance;
+        }
+      };
+      await expect(
+        reportAfterRun(run, () => tracker.throwIfFailed(), radio),
+      ).rejects.toBe(failing ? runError : collectionError);
+      expect(collectReport).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe("CLI coverage", () => {

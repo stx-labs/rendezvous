@@ -141,6 +141,7 @@ export const main = async () => {
       `\nContract "${runConfig.sutContractName}" not found among project contracts.\n`,
     );
     process.exitCode = 1;
+    coverage?.throwIfFailed();
     return;
   }
 
@@ -154,6 +155,7 @@ export const main = async () => {
 
   const reportCoverage = (tracker: CoverageTracker) => {
     tracker.collect(simnet);
+    tracker.throwIfFailed();
     const report = tracker.summary();
     radio.emit(
       "logMessage",

@@ -70,6 +70,7 @@ export class CoverageTracker {
   private readonly now: () => number;
   private evaluations = 0;
   private lastIncreaseMs: number | null = null;
+  private collectionFailure: { error: unknown } | undefined = undefined;
 
   constructor(now: () => number = () => performance.now()) {
     this.now = now;
@@ -150,17 +151,33 @@ export class CoverageTracker {
    * the coverage identities.
    */
   collect(simnet: Pick<Simnet, "collectReport">): string[] {
-    const report = simnet.collectReport(false, "");
-    let novel: string[] = [];
+    if (this.collectionFailure) {
+      return [];
+    }
     try {
-      novel = this.ingest(report.coverage);
-    } finally {
-      report.free();
+      const report = simnet.collectReport(false, "");
+      let novel: string[] = [];
+      try {
+        novel = this.ingest(report.coverage);
+      } finally {
+        report.free();
+      }
+      if (novel.length > 0) {
+        this.curve.push(this.point());
+      }
+      return novel;
+    } catch (error) {
+      // Reporting must not replace a predicate failure or disrupt shrinking.
+      this.collectionFailure = { error };
+      return [];
     }
-    if (novel.length > 0) {
-      this.curve.push(this.point());
+  }
+
+  /** Surface collection failures only after the campaign result is known. */
+  throwIfFailed(): void {
+    if (this.collectionFailure) {
+      throw this.collectionFailure.error;
     }
-    return novel;
   }
 
   /** Sample after a completed candidate, including failures and shrinking. */
@@ -246,26 +263,16 @@ export const reportAfterRun = async (
   report: () => void,
   radio: EventEmitter,
 ): Promise<void> => {
-  let runFailed = false;
-  let runError: unknown = undefined;
   try {
     await run();
-  } catch (error) {
-    runFailed = true;
-    runError = error;
-  }
-  try {
-    report();
-  } catch (error) {
-    if (!runFailed) {
-      throw error;
+  } catch (runError) {
+    try {
+      report();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      radio.emit("logFailure", `\nCoverage report failed: ${message}`);
     }
-    radio.emit(
-      "logFailure",
-      `\nCoverage report failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (runFailed) {
     throw runError;
   }
+  report();
 };

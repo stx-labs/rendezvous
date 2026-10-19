@@ -5,6 +5,7 @@ export interface RunDetails {
   counterexample: CounterExample[];
   numRuns: number;
   seed: number;
+  counterexamplePath?: string | null;
   path?: string;
   error?: Error;
   errorInstance?: Error;

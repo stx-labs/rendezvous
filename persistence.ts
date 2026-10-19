@@ -11,6 +11,8 @@ interface FailureRecord {
   seed: number;
   /** The number of runs needed to reproduce the failure*/
   numRuns: number;
+  /** The fast-check path to the counterexample */
+  counterexamplePath?: string | null;
   /** The path to the dialer file used for this test run */
   dial: string | undefined;
   /** Timestamp when the failure was recorded */
@@ -115,6 +117,7 @@ export const persistFailure = (
     seed: runDetails.seed,
     dial: dial,
     numRuns: runDetails.numRuns,
+    counterexamplePath: runDetails.counterexamplePath ?? runDetails.path,
     timestamp: Date.now(),
   };
 

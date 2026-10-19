@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -408,6 +408,51 @@ describe("Failure Persistence", () => {
           },
         ),
       );
+    });
+
+    it("persists paths and reads records from older files", () => {
+      const customBaseDir = createTemporaryCustomTestBaseDir("paths");
+      const options = { baseDir: customBaseDir };
+
+      try {
+        persistFailure(
+          {
+            ...createMockRunDetails(1),
+            counterexamplePath: "0:1",
+            path: "legacy",
+          },
+          "test",
+          TEST_CONTRACT_ID,
+          undefined,
+          options,
+        );
+        persistFailure(
+          { ...createMockRunDetails(2), path: "legacy" },
+          "test",
+          TEST_CONTRACT_ID,
+          undefined,
+          options,
+        );
+
+        const failures = loadFailures(TEST_CONTRACT_ID, "test", options);
+        expect(
+          failures.find(({ seed }) => seed === 1)?.counterexamplePath,
+        ).toBe("0:1");
+        expect(
+          failures.find(({ seed }) => seed === 2)?.counterexamplePath,
+        ).toBe("legacy");
+
+        const record = { seed: 17, numRuns: 20, timestamp: 123 };
+        writeFileSync(
+          getFailureFilePath(TEST_CONTRACT_ID, customBaseDir),
+          JSON.stringify({ invariant: [record], test: [] }),
+        );
+        expect(loadFailures(TEST_CONTRACT_ID, "invariant", options)).toEqual([
+          record,
+        ]);
+      } finally {
+        rmSync(customBaseDir, { recursive: true, force: true });
+      }
     });
   });
 

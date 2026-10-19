@@ -176,14 +176,17 @@ describe("Evaluation observer", () => {
       Object.getPrototypeOf(fc.asyncProperty(fc.constant(1), async () => {})),
       "afterEach",
     );
-    await fc.assert(
-      observedAsyncProperty(radio)(fc.integer(), async (value) => {
-        observed.push(value);
-      }),
-      { seed: 42, numRuns: 25 },
-    );
-    expect(afterEach).not.toHaveBeenCalled();
-    afterEach.mockRestore();
+    try {
+      await fc.assert(
+        observedAsyncProperty(radio)(fc.integer(), async (value) => {
+          observed.push(value);
+        }),
+        { seed: 42, numRuns: 25 },
+      );
+      expect(afterEach).not.toHaveBeenCalled();
+    } finally {
+      afterEach.mockRestore();
+    }
     await fc.assert(
       fc.asyncProperty(fc.integer(), async (value) => {
         stock.push(value);
@@ -228,25 +231,31 @@ describe("SDK coverage reports", () => {
       resolve(__dirname, "example"),
       "rendezvous-coverage-sdk-",
     );
-    const manifestPath = join(project, "Clarinet.toml");
-    await simnet.initSession(process.cwd(), manifestPath, null);
-    const tracker = new CoverageTracker();
-    tracker.collect(simnet);
-    simnet.callPublicFn("counter", "increment", [], simnet.deployer);
-    expect(tracker.collect(simnet)).toContain(
-      JSON.stringify([join(project, "contracts/counter.clar"), "line", 16]),
-    );
-    const empty = simnet.collectReport(false, "");
-    expect(empty.coverage).toBe("");
-    empty.free();
-    const before = tracker.summary().lines.hit;
-    await simnet.initSession(process.cwd(), manifestPath, null);
-    tracker.collect(simnet);
-    simnet.callPublicFn("counter", "decrement", [], simnet.deployer);
-    expect(tracker.collect(simnet).length).toBeGreaterThan(0);
-    expect(tracker.summary().lines.hit).toBeGreaterThan(before);
-    // The SDK session is a Proxy; let its target's finalizer release it.
-    rmSync(project, { recursive: true, force: true });
+    try {
+      const manifestPath = join(project, "Clarinet.toml");
+      await simnet.initSession(process.cwd(), manifestPath, null);
+      const tracker = new CoverageTracker();
+      tracker.collect(simnet);
+      simnet.callPublicFn("counter", "increment", [], simnet.deployer);
+      expect(tracker.collect(simnet)).toContain(
+        JSON.stringify([join(project, "contracts/counter.clar"), "line", 16]),
+      );
+      const empty = simnet.collectReport(false, "");
+      try {
+        expect(empty.coverage).toBe("");
+      } finally {
+        empty.free();
+      }
+      const before = tracker.summary().lines.hit;
+      await simnet.initSession(process.cwd(), manifestPath, null);
+      tracker.collect(simnet);
+      simnet.callPublicFn("counter", "decrement", [], simnet.deployer);
+      expect(tracker.collect(simnet).length).toBeGreaterThan(0);
+      expect(tracker.summary().lines.hit).toBeGreaterThan(before);
+    } finally {
+      // The SDK session is a Proxy; let its target's finalizer release it.
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 });
 
@@ -360,27 +369,27 @@ describe("CLI coverage", () => {
       const jsonPath = join(project, "coverage.json");
       const lcovPath = join(project, "coverage.lcov");
       const configPath = join(project, "rv.coverage-test.json");
-      const initial = await initSimnet(join(project, "Clarinet.toml"));
-      // SDK account-map order varies between fresh instances. Freeze the
-      // caller pool with the existing config API to compare seeded calls.
-      const config = {
-        seed: 42,
-        runs: 10,
-        bail: true,
-        accounts: [...initial.getAccounts()]
-          .filter(([name]) => name !== "faucet")
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, address]) => ({ name, address })),
-      };
-      const argv = [
-        "node",
-        "app.js",
-        project,
-        contract,
-        type,
-        `--config=${configPath}`,
-      ];
       try {
+        const initial = await initSimnet(join(project, "Clarinet.toml"));
+        // SDK account-map order varies between fresh instances. Freeze the
+        // caller pool with the existing config API to compare seeded calls.
+        const config = {
+          seed: 42,
+          runs: 10,
+          bail: true,
+          accounts: [...initial.getAccounts()]
+            .filter(([name]) => name !== "faucet")
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([name, address]) => ({ name, address })),
+        };
+        const argv = [
+          "node",
+          "app.js",
+          project,
+          contract,
+          type,
+          `--config=${configPath}`,
+        ];
         writeFileSync(configPath, JSON.stringify(config));
         process.argv = argv;
         await main();
@@ -399,9 +408,10 @@ describe("CLI coverage", () => {
         await main();
         expect(logs.filter((line) => line.startsWith("₿"))).toEqual(stock);
         // Only files the run reached are listed under the totals.
-        expect(
-          logs.find((line) => line.startsWith(`  contracts/${contract}.clar:`)),
-        ).toMatch(/: [1-9]\d*\/\d+ lines, \d+\/\d+ branches$/);
+        const reachedFile = `  contracts/${contract}.clar:`;
+        expect(logs.find((line) => line.startsWith(reachedFile))).toMatch(
+          /: [1-9]\d*\/\d+ lines, \d+\/\d+ branches$/,
+        );
         expect(
           logs.some((line) => line.startsWith("  contracts/cargo.clar:")),
         ).toBe(false);
@@ -433,10 +443,6 @@ describe("CLI coverage", () => {
       } finally {
         process.argv = initialArgv;
         log.mockRestore();
-        await initSimnet(join(project, "Clarinet.toml"), true, {
-          trackCosts: false,
-          trackCoverage: false,
-        });
         rmSync(project, { recursive: true, force: true });
       }
     },

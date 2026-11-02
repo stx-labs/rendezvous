@@ -20,9 +20,13 @@ afterEach(() => {
 /**
  * Runs Rendezvous against a single contract in a temporary Clarinet project
  * without requirements and returns the logs, exit code and the number of
- * persisted failures.
+ * persisted failures. Without bailing, fast-check shrinks the failure.
  */
-const run = async (source: string, type: "test" | "invariant" = "test") => {
+const run = async (
+  source: string,
+  type: "test" | "invariant" = "test",
+  bail = true,
+) => {
   const directory = mkdtempSync(join(tmpdir(), "rendezvous-test-outcome-"));
   mkdirSync(join(directory, "settings"));
   writeFileSync(
@@ -59,6 +63,7 @@ balance = 100000000000000
   const persist = vi
     .spyOn(persistence, "persistFailure")
     .mockImplementation(() => {});
+  persist.mockClear();
   const manifestPath = join(directory, "Clarinet.toml");
   try {
     const simnet = await initSimnet(manifestPath);
@@ -79,7 +84,7 @@ balance = 100000000000000
         functions,
         17,
         20,
-        true,
+        bail,
         false,
         radio,
         accounts,
@@ -94,7 +99,7 @@ balance = 100000000000000
         17,
         20,
         undefined,
-        true,
+        bail,
         false,
         radio,
         accounts,
@@ -162,11 +167,13 @@ describe("Property testing outcomes", () => {
       "(define-read-only (can-test-fail) (is-eq (/ u1 u0) u0)) " +
         "(define-private (test-fail) (ok true))",
     ],
-  ])("counts %s as a single failure when bailing", async (_, source) => {
-    const result = await run(source);
-    expect(result.exitCode).toBe(1);
-    expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1/);
-    expect(result.persisted).toBe(1);
+  ])("counts %s as a single failure", async (_, source) => {
+    for (const bail of [true, false]) {
+      const result = await run(source, "test", bail);
+      expect(result.exitCode).toBe(1);
+      expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1/);
+      expect(result.persisted).toBe(1);
+    }
   });
 });
 
@@ -181,19 +188,19 @@ describe("Invariant testing outcomes", () => {
       "a runtime error",
       "(define-read-only (invariant-fail) (is-eq (/ u1 u0) u0))",
     ],
-  ])(
-    "counts %s as a single invariant failure when bailing",
-    async (_, invariant) => {
+  ])("counts %s as a single invariant failure", async (_, invariant) => {
+    for (const bail of [true, false]) {
       const result = await run(
         `${context} (define-public (touch) (ok true)) ${invariant}`,
         "invariant",
+        bail,
       );
       expect(result.exitCode).toBe(1);
       expect(result.logs).toMatch(/FAILED[\s│└─]*invariant-fail: x1/);
-    },
-  );
+    }
+  });
 
-  it("keeps successful calls when updating the context throws", async () => {
+  it("stops the run when updating the context throws", async () => {
     const result = await run(
       `(define-map context (string-ascii 100) uint)
 (define-private (update-context (name (string-ascii 100)) (calls uint))
@@ -202,12 +209,10 @@ describe("Invariant testing outcomes", () => {
 (define-read-only (invariant-pass) true)`,
       "invariant",
     );
-    expect(result.logs).toMatch(/SUCCESSFUL[\s│└─]*touch: x99/);
-    expect(result.logs).toMatch(/IGNORED[\s│└─]*touch: x0/);
-    expect(result.logs).toContain("Could not update context for touch:");
+    expect(result.logs).toContain("Could not update the context for touch:");
     expect(result.logs).toContain("DivisionByZero");
-    expect(result.logs).toContain("OK, invariants passed after 20 runs.");
-    expect(result.exitCode).toBe(0);
+    expect(result.logs).not.toContain("OK, invariants passed");
+    expect(result.exitCode).toBe(1);
   });
 
   it("reports all-thrown public calls as inconclusive", async () => {

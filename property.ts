@@ -7,7 +7,7 @@ import { cvToJSON, cvToString, type ClarityValue } from "@stacks/transactions";
 import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
-import { reporter } from "./heatstroke";
+import { reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
 import { strategyFor } from "./lib";
 import {
@@ -313,8 +313,10 @@ const propertyTest = async (
     statistics.test!.failed.set(functionInterface.name, 0);
   }
 
+  const failureStatistics = trackFailureStatistics(statistics);
+
   const radioReporter = async (runDetails: any) => {
-    reporter(runDetails, radio, "test", statistics);
+    reporter(runDetails, radio, "test", failureStatistics.get());
 
     // Persist failures for regression testing.
     if (runDetails.failed) {
@@ -371,7 +373,7 @@ const propertyTest = async (
             })
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
-      async (r) => {
+      failureStatistics.track(async (r) => {
         const printedTestFunctionArgs = r.functionArgs
           .map((cv) => cvToString(cv))
           .join(" ");
@@ -518,7 +520,7 @@ const propertyTest = async (
           // Re-throw the error for fast-check to catch and process.
           throw error;
         }
-      },
+      }),
     ),
     {
       endOnFailure: bail,

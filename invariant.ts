@@ -13,7 +13,7 @@ import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
 import { DialerRegistry, PostDialerError, PreDialerError } from "./dialer";
-import { reporter } from "./heatstroke";
+import { reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
 import type {
   InvariantTestConfig,
@@ -351,8 +351,10 @@ const invariantTest = async (
     statistics.invariant!.failed.set(functionInterface.name, 0);
   }
 
+  const failureStatistics = trackFailureStatistics(statistics);
+
   const radioReporter = async (runDetails: any) => {
-    reporter(runDetails, radio, "invariant", statistics);
+    reporter(runDetails, radio, "invariant", failureStatistics.get());
 
     // Persist failures for regression testing.
     if (runDetails.failed) {
@@ -425,7 +427,7 @@ const invariantTest = async (
             })
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
-      async (r) => {
+      failureStatistics.track(async (r) => {
         for (const [index, selectedFunction] of r.selectedFunctions.entries()) {
           const [sutCallerWallet, sutCallerAddress] = r.sutCallers[index];
 
@@ -446,18 +448,12 @@ const invariantTest = async (
           }
 
           try {
-            let functionCall = null;
-            try {
-              functionCall = simnet.callPublicFn(
-                r.rendezvousContractId,
-                selectedFunction.name,
-                r.selectedFunctionsArgsList[index],
-                sutCallerAddress,
-              );
-            } catch (error) {
-              statistics.sut!.thrown++;
-              throw error;
-            }
+            const functionCall = simnet.callPublicFn(
+              r.rendezvousContractId,
+              selectedFunction.name,
+              r.selectedFunctionsArgsList[index],
+              sutCallerAddress,
+            );
 
             const functionCallResultJson = cvToJSON(functionCall.result);
 
@@ -487,9 +483,9 @@ const invariantTest = async (
                   simnet.deployer,
                 );
               } catch (error) {
-                radio.emit(
-                  "logInfo",
-                  `Could not update context for ${selectedFunction.name}: ` +
+                // Invariants would read a stale context, so stop the run.
+                throw new ContextUpdateError(
+                  `Could not update the context for ${selectedFunction.name}: ` +
                     String(error),
                 );
               }
@@ -539,10 +535,12 @@ const invariantTest = async (
           } catch (error: any) {
             if (
               error instanceof PreDialerError ||
-              error instanceof PostDialerError
+              error instanceof PostDialerError ||
+              error instanceof ContextUpdateError
             ) {
               throw error;
             } else {
+              statistics.sut!.thrown++;
               statistics.sut!.failed.set(
                 selectedFunction.name,
                 statistics.sut!.failed.get(selectedFunction.name)! + 1,
@@ -664,7 +662,7 @@ const invariantTest = async (
         if (r.canMineBlocks) {
           simnet.mineEmptyBurnBlocks(r.burnBlocks);
         }
-      },
+      }),
     ),
     {
       endOnFailure: bail,
@@ -800,6 +798,8 @@ export class FalsifiedInvariantError extends Error {
     this.clarityError = clarityError;
   }
 }
+
+export class ContextUpdateError extends Error {}
 
 const emitInvariantRegressionTestHeader = (
   radio: EventEmitter,

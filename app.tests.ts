@@ -514,16 +514,20 @@ describe("Fail on unchecked tests", () => {
   ])(
     "sets a failing exit code for unchecked tests only on request (%j)",
     async (flags, fails) => {
-      // Setup: with this seed, every slice test case is discarded.
+      // Setup: every case of the only test is discarded.
       const tempDir = createIsolatedTestEnvironment(
         resolve(__dirname, "example"),
         isolatedTestEnvPrefix,
+      );
+      writeFileSync(
+        join(tempDir, "contracts/counter.clar"),
+        "(define-private (test-discard) (ok false))",
       );
       process.argv = [
         "node",
         "app.js",
         tempDir,
-        "slice",
+        "counter",
         "test",
         "--seed=3",
         "--runs=40",
@@ -551,10 +555,10 @@ describe("Fail on unchecked tests", () => {
           logs.some((log) => log.includes("not checked after 40 runs")),
         ).toBe(true);
         expect(
-          logs.some((log) =>
+          logs.filter((log) =>
             log.includes("Failing the run because of --fail-on-unchecked."),
           ),
-        ).toBe(fails);
+        ).toHaveLength(fails ? 1 : 0);
         expect(process.exitCode).toBe(fails ? 1 : undefined);
       } finally {
         // Teardown

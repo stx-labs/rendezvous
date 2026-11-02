@@ -236,6 +236,31 @@ export const reporter = (
   radio.emit("logMessage", "\n");
 };
 
+/**
+ * Keeps the statistics as they were at the first failure. Without bailing,
+ * fast-check re-runs the predicate while shrinking, and those attempts would
+ * otherwise be counted as test cases.
+ * @param statistics The statistics updated by the predicate.
+ * @returns `track` to wrap the predicate and `get` to read the statistics to
+ * report.
+ */
+export const trackFailureStatistics = (statistics: Statistics) => {
+  let atFailure: Statistics | undefined = undefined;
+  return {
+    track:
+      <T>(predicate: (input: T) => Promise<void>) =>
+      async (input: T) => {
+        try {
+          await predicate(input);
+        } catch (error) {
+          atFailure ??= structuredClone(statistics);
+          throw error;
+        }
+      },
+    get: () => atFailure ?? statistics,
+  };
+};
+
 const ARROW = "->";
 const SUCCESS_SYMBOL = "+";
 const FAIL_SYMBOL = "-";

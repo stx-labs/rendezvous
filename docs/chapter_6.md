@@ -381,17 +381,16 @@ A config file is a JSON object with optional fields:
 }
 ```
 
-| Field           | Type             | Description                                             |
-| --------------- | ---------------- | ------------------------------------------------------- |
-| `accounts`      | array of objects | Custom accounts (`name` and `address` fields required). |
-| `accounts_mode` | string           | `"overwrite"` (default) or `"concatenate"`.             |
-| `seed`          | integer          | Seed for replay functionality.                          |
-| `runs`          | positive integer | Number of test iterations.                              |
-| `bail`          | boolean          | Stop on first failure.                                  |
-| `regr`          | boolean          | Run regression tests only.                              |
-| `dial`          | string           | Path to custom dialers file.                            |
-
-`fail_on_unchecked` (boolean): Enable `--fail-on-unchecked`.
+| Field               | Type             | Description                                             |
+| ------------------- | ---------------- | ------------------------------------------------------- |
+| `accounts`          | array of objects | Custom accounts (`name` and `address` fields required). |
+| `accounts_mode`     | string           | `"overwrite"` (default) or `"concatenate"`.             |
+| `seed`              | integer          | Seed for replay functionality.                          |
+| `runs`              | positive integer | Number of test iterations.                              |
+| `bail`              | boolean          | Stop on first failure.                                  |
+| `regr`              | boolean          | Run regression tests only.                              |
+| `dial`              | string           | Path to custom dialers file.                            |
+| `fail_on_unchecked` | boolean          | Fail the run when a test or invariant goes unchecked.   |
 
 The `accounts` field lets you define custom accounts for testing. By default (`"overwrite"` mode), these replace the Devnet.toml accounts entirely. With `"concatenate"` mode, config accounts are merged with the existing Devnet accounts — if a name appears in both, the config account's address takes precedence.
 
@@ -399,21 +398,18 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 
 ### Summary
 
-| Argument/Option              | Description                                                                      | Example                                           |
-| ---------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `<path-to-clarinet-project>` | Path to the Clarinet project (where `Clarinet.toml` is located).                 | `rv root contract test`                           |
-| `<contract-name>`            | Name of the contract to test (as in `Clarinet.toml`).                            | `rv root contract test`                           |
-| `<type>`                     | Type of test (`test` for property-based tests, `invariant` for invariant tests). | `rv root contract test`                           |
-| `--runs=<num>`               | Sets the number of test iterations (default: 100).                               | `rv root contract test --runs=500`                |
-| `--seed=<num>`               | Uses a specific seed for reproducibility.                                        | `rv root contract test --seed=12345`              |
-| `--regr`                     | Run regression tests only (replay saved failures).                               | `rv root contract test --regr`                    |
-| `--bail`                     | Stop after the first failure.                                                    | `rv root contract test --bail`                    |
-| `--dial=<file>`              | Loads JavaScript dialers from a file for pre/post-processing.                    | `rv root contract test --dial=./custom-dialer.js` |
-| `--config=<file>`            | Uses a JSON config file for all run options.                                     | `rv root contract test --config=rv.config.json`   |
-
-`--fail-on-unchecked` fails for unchecked tests or invariants and for
-invariant campaigns where every public call throws. Example:
-`rv root contract test --fail-on-unchecked` (exit 1).
+| Argument/Option              | Description                                                                             | Example                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `<path-to-clarinet-project>` | Path to the Clarinet project (where `Clarinet.toml` is located).                        | `rv root contract test`                           |
+| `<contract-name>`            | Name of the contract to test (as in `Clarinet.toml`).                                   | `rv root contract test`                           |
+| `<type>`                     | Type of test (`test` for property-based tests, `invariant` for invariant tests).        | `rv root contract test`                           |
+| `--runs=<num>`               | Sets the number of test iterations (default: 100).                                      | `rv root contract test --runs=500`                |
+| `--seed=<num>`               | Uses a specific seed for reproducibility.                                               | `rv root contract test --seed=12345`              |
+| `--regr`                     | Run regression tests only (replay saved failures).                                      | `rv root contract test --regr`                    |
+| `--bail`                     | Stop after the first failure.                                                           | `rv root contract test --bail`                    |
+| `--dial=<file>`              | Loads JavaScript dialers from a file for pre/post-processing.                           | `rv root contract test --dial=./custom-dialer.js` |
+| `--config=<file>`            | Uses a JSON config file for all run options.                                            | `rv root contract test --config=rv.config.json`   |
+| `--fail-on-unchecked`        | Exits with code 1 when a test or invariant goes unchecked, or every public call throws. | `rv root contract test --fail-on-unchecked`       |
 
 ---
 

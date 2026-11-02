@@ -3,34 +3,40 @@ on:
   release:
     types: [published]
 
-permissions:
-  id-token: write
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   publish:
     environment: "Publish to NPM"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # setup-node never caches pnpm unless asked; stating it keeps zizmor's
+      # cache-poisoning audit quiet for a job with publish access.
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-      - name: Update npm
-        run: npm install -g npm@latest
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm run build
+      # Trusted publishing (OIDC) authenticates. Earlier releases carry
+      # provenance, so require it: consumers with trustPolicy: no-downgrade
+      # would refuse a release without it.
       - name: Publish
         run: |
           # Keep RCs off the `latest` dist-tag so plain `npm install` still
           # resolves to the latest stable release.
           if [[ "${GITHUB_REF_NAME}" == *-rc* ]]; then
-            npm publish --tag rc
+            pnpm publish --provenance --tag rc --no-git-checks
           else
-            npm publish
+            pnpm publish --provenance --no-git-checks
           fi
 
   update-example-post-release:
@@ -39,6 +45,9 @@ jobs:
     # release.
     if: ${{ !contains(github.ref_name, '-rc') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     env:
       VERSION: ${{ github.ref_name }}
       BRANCH_NAME: post-release/update-example
@@ -46,10 +55,11 @@ jobs:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
       - name: Wait for npm propagation
         run: sleep 30
@@ -60,7 +70,7 @@ jobs:
 
           # Retry up to 5 times with 10 second intervals.
           for i in {1..5}; do
-            if npm view @stacks/rendezvous@$VERSION version >/dev/null 2>&1; then
+            if pnpm view "@stacks/rendezvous@$VERSION" version >/dev/null 2>&1; then
               echo "Package @stacks/rendezvous@$VERSION is available on npm"
               break
             else
@@ -73,13 +83,12 @@ jobs:
             fi
           done
 
+      # Updating the lockfile is the point of this step.
       - name: Update example project to use published version
-        run: |
+        run: | # zizmor: ignore[adhoc-packages]
           echo "Updating example project to use version: $VERSION"
           # Update example to use the published version.
-          cd example
-          npm install @stacks/rendezvous@$VERSION
-          cd ..
+          pnpm --dir example add "@stacks/rendezvous@^$VERSION"
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -92,7 +101,7 @@ jobs:
           commit-message: "Update example project to use @stacks/rendezvous@${{ env.VERSION }}"
           add-paths: |
             example/package.json
-            example/package-lock.json
+            pnpm-lock.yaml
           body: |
             This post-release PR updates the `example` Clarinet project to use the latest Rendezvous version.
 

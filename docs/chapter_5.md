@@ -34,7 +34,7 @@ This chapter covers how to install Rendezvous and set up your environment for ef
 
 Before installing Rendezvous, ensure you have the following prerequisites:
 
-- **Node.js**: Rendezvous supports Node.js versions 20, 22, and 24. Other versions may work but are untested.
+- **Node.js**: Rendezvous requires Node.js 22.12 or later and is tested on Node.js 22 and 24. Other versions may work but are untested.
 - **Clarinet**: You need a Clarinet project to use Rendezvous. If you don't have Clarinet installed, follow the [official Clarinet installation guide](https://github.com/stx-labs/clarinet).
 
 ## Standard Installation
@@ -59,7 +59,9 @@ With a global installation, you can run the `rv` command from any directory with
 
 ## Development/Contribution Installation
 
-If you want to contribute to Rendezvous or run it from source:
+If you want to contribute to Rendezvous or run it from source, you need
+[pnpm](https://pnpm.io/installation). The repository pins its pnpm version in
+`package.json`.
 
 1. Clone the repository:
 
@@ -76,18 +78,18 @@ If you want to contribute to Rendezvous or run it from source:
 3. Install dependencies:
 
    ```bash
-   npm install
+   pnpm install
    ```
 
 4. Build the project:
 
    ```bash
-   npm run build
+   pnpm run build
    ```
 
 5. Link the package globally (optional):
    ```bash
-   npm link
+   npm install -g .
    ```
 
 ## Verifying Your Installation
@@ -130,7 +132,7 @@ my-project/
 
 **Node.js Version Conflicts**
 
-If you encounter errors related to Node.js versions, ensure you're using a supported version (20, 22, or 24).
+If you encounter errors related to Node.js versions, ensure you're using a supported version (22.12 or later).
 
 ```bash
 node --version
@@ -184,7 +186,7 @@ If you installed from source:
 1. If you linked the package globally, unlink it first:
 
    ```bash
-   npm unlink -g @stacks/rendezvous
+   npm uninstall -g @stacks/rendezvous
    ```
 
 2. You can then remove the cloned repository directory:

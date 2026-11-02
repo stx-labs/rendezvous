@@ -125,6 +125,7 @@ export const main = async () => {
       "logFailure",
       `\nContract "${runConfig.sutContractName}" not found among project contracts.\n`,
     );
+    process.exitCode = 1;
     return;
   }
 

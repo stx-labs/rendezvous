@@ -259,10 +259,10 @@ export const trackFailureStatistics = (statistics: Statistics) => {
   let atFailure: Statistics | undefined = undefined;
   return {
     track:
-      <T>(predicate: (input: T) => Promise<void>) =>
+      <T, R>(predicate: (input: T) => Promise<R>) =>
       async (input: T) => {
         try {
-          await predicate(input);
+          return await predicate(input);
         } catch (error) {
           atFailure ??= structuredClone(statistics);
           throw error;

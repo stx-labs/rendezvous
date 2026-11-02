@@ -194,6 +194,7 @@ export const checkInvariants = async (
         `No public functions found for the "${targetContractName}" contract. Without public functions, no state transitions can happen inside the contract, and the invariant test is not meaningful.\n`,
       ),
     );
+    radio.emit("unchecked");
     return;
   }
 
@@ -204,6 +205,7 @@ export const checkInvariants = async (
         `No invariant functions found for the "${targetContractName}" contract. Beware, for your contract may be exposed to unforeseen issues.\n`,
       ),
     );
+    radio.emit("unchecked");
     return;
   }
 
@@ -472,18 +474,26 @@ const invariantTest = async (
                 selectedFunction.name
               ];
 
+              // Invariants would read a stale context, so stop the run.
+              let contextUpdate: string | undefined = undefined;
               try {
-                simnet.callPrivateFn(
+                const { result } = simnet.callPrivateFn(
                   r.rendezvousContractId,
                   "update-context",
                   [Cl.stringAscii(selectedFunction.name), Cl.uint(calls)],
                   simnet.deployer,
                 );
+                const json = cvToJSON(result);
+                if (!json.success || !json.value) {
+                  contextUpdate = `returned ${cvToString(result)}`;
+                }
               } catch (error) {
-                // Invariants would read a stale context, so stop the run.
+                contextUpdate = String(error);
+              }
+              if (contextUpdate !== undefined) {
                 throw new ContextUpdateError(
                   `Could not update the context for ${selectedFunction.name}: ` +
-                    String(error),
+                    contextUpdate,
                 );
               }
 
@@ -691,6 +701,8 @@ const emitMissingTraitWarnings = (
         `\nWarning: The following invariant functions reference traits without eligible implementations and will be skipped:\n\n${functionList}\n`,
       ),
     );
+    // Skipped invariants are never checked.
+    radio.emit("unchecked");
   }
 
   radio.emit(

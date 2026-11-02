@@ -59,7 +59,8 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
 - `--regr` – Run regression tests only (replay saved failures).
 - `--bail` – Stop after the first failure.
 - `--fail-on-unchecked` – Fail the run (exit code 1) if a test or invariant was
-  never checked (all of its cases were discarded, or it was never selected).
+  never checked (all of its cases were discarded, it was never selected, or it
+  was skipped), or if the contract has none to run.
   It also fails inconclusive invariant campaigns where every public call
   throws; these only warn by default.
 - `--dial` – The path to a JavaScript file containing custom pre- and

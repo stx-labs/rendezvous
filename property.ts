@@ -192,6 +192,7 @@ export const checkProperties = async (
         `No test functions found for the "${targetContractName}" contract.\n`,
       ),
     );
+    radio.emit("unchecked");
     return;
   }
 
@@ -546,6 +547,8 @@ const emitMissingTraitWarning = (
       `Note: You can add contracts implementing traits either as project contracts or as requirements.\n`,
     ),
   );
+  // Skipped tests are never checked.
+  radio.emit("unchecked");
 };
 
 /**

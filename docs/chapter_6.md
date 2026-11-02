@@ -587,8 +587,10 @@ Discarded cases do not count as checks. Rendezvous warns instead of printing
 a passing summary if any test has no passing case (all its cases were
 discarded or it was never selected), or an invariant was never selected.
 Invariant campaigns where every public call throws warn as inconclusive.
+Tests or invariants skipped for missing trait implementations, and contracts
+without any, also count as unchecked.
 Default exit codes are unchanged; `--fail-on-unchecked` (config key
-`fail_on_unchecked`) makes either warning fail the run with exit code 1.
+`fail_on_unchecked`) makes any of these fail the run with exit code 1.
 
 ## Custom Manifest Files
 

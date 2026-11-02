@@ -584,6 +584,7 @@ describe("Contract selection", () => {
       isolatedTestEnvPrefix,
     );
     process.argv = ["node", "app.js", tempDir, "nonexistent", "test"];
+    const initialExitCode = process.exitCode;
 
     const consoleErrors: string[] = [];
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -598,8 +599,10 @@ describe("Contract selection", () => {
     expect(consoleErrors).toContain(
       red(`\nContract "nonexistent" not found among project contracts.\n`),
     );
+    expect(process.exitCode).toBe(1);
 
     // Teardown
+    process.exitCode = initialExitCode;
     process.argv = initialArgv;
     vi.restoreAllMocks();
     rmSync(tempDir, { recursive: true, force: true });

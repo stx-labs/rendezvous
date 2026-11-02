@@ -58,6 +58,8 @@ balance = 100000000000000
   for (const event of ["logMessage", "logFailure", "logInfo"]) {
     radio.on(event, (message: string) => logs.push(message));
   }
+  let unchecked = 0;
+  radio.on("unchecked", () => unchecked++);
   process.exitCode = 0;
   // Keep failing runs from writing regression files to the working directory.
   const persist = vi
@@ -110,6 +112,7 @@ balance = 100000000000000
       logs: stripVTControlCharacters(logs.join("\n")),
       exitCode: process.exitCode,
       persisted: persist.mock.calls.length,
+      unchecked,
     };
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -157,6 +160,13 @@ describe("Property testing outcomes", () => {
       "Warning: not checked after 20 runs: test-discard.",
     );
     expect(result.logs).not.toContain("properties passed");
+  });
+
+  it("flags a run without test functions as unchecked", async () => {
+    const result = await run("(define-read-only (get-one) u1)");
+    expect(result.logs).toContain("No test functions found");
+    expect(result.unchecked).toBe(1);
+    expect(result.exitCode).toBe(0);
   });
 
   it("reports passing tests as passed", async () => {
@@ -213,19 +223,40 @@ describe("Invariant testing outcomes", () => {
     },
   );
 
-  it("stops the run when updating the context throws", async () => {
+  it.each([
+    [
+      "throws",
+      "(ok (map-set context name (/ u1 (if (> calls u0) u0 u1))))",
+      "DivisionByZero",
+    ],
+    [
+      "returns an error",
+      "(if (> calls u0) (err u7) (ok (map-set context name calls)))",
+      "returned (err u7)",
+    ],
+  ])("stops the run when updating the context %s", async (_, body, reason) => {
     const result = await run(
       `(define-map context (string-ascii 100) uint)
 (define-private (update-context (name (string-ascii 100)) (calls uint))
-  (ok (map-set context name (/ u1 (if (> calls u0) u0 u1)))))
+  ${body})
 (define-public (touch) (ok true))
 (define-read-only (invariant-pass) true)`,
       "invariant",
     );
     expect(result.logs).toContain("Could not update the context for touch:");
-    expect(result.logs).toContain("DivisionByZero");
+    expect(result.logs).toContain(reason);
     expect(result.logs).not.toContain("OK, invariants passed");
     expect(result.exitCode).toBe(1);
+  });
+
+  it("flags a run without invariants as unchecked", async () => {
+    const result = await run(
+      `${context} (define-public (touch) (ok true))`,
+      "invariant",
+    );
+    expect(result.logs).toContain("No invariant functions found");
+    expect(result.unchecked).toBe(1);
+    expect(result.exitCode).toBe(0);
   });
 
   it("reports all-thrown public calls as inconclusive", async () => {

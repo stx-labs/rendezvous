@@ -21,7 +21,8 @@
     "lint:fix": "oxlint -c oxlintrc.json --fix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "bench": "npm run build && node bench/run.mjs"
   },
   "keywords": [
     "stacks",

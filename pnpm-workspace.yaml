@@ -14,7 +14,8 @@ minimumReleaseAge: 7200
 # than for an earlier release.
 trustPolicy: no-downgrade
 
-# Refuse to install with an unsupported Node.js or pnpm version.
+# Refuse to install with an unsupported pnpm version, or a Node.js version a
+# dependency (such as @stacks/clarinet-sdk) does not support.
 engineStrict: true
 
 # Our own package: the post-release workflow bumps the example to it as soon as

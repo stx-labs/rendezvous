@@ -80,6 +80,19 @@ export const main = async () => {
 
   logWarnings(radio, runConfig.warnings);
 
+  // Unchecked tests and inconclusive campaigns fail only on request.
+  if (runConfig.failOnUnchecked) {
+    for (const event of ["unchecked", "inconclusive"]) {
+      radio.on(event, () => {
+        radio.emit(
+          "logFailure",
+          "Failing the run because of --fail-on-unchecked.\n",
+        );
+        process.exitCode = 1;
+      });
+    }
+  }
+
   const manifestPath = join(
     runConfig.manifestDir,
     getManifestFileName(runConfig.manifestDir, runConfig.sutContractName),

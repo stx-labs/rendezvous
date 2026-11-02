@@ -382,31 +382,31 @@ const propertyTest = async (
           .get(r.rendezvousContractId)!
           .get(r.selectedTestFunction.name);
 
-        const discarded = isTestDiscarded(
-          discardFunctionName,
-          r.functionArgs,
-          r.rendezvousContractId,
-          simnet,
-          testCallerAddress,
-        );
+        try {
+          const discarded = isTestDiscarded(
+            discardFunctionName,
+            r.functionArgs,
+            r.rendezvousContractId,
+            simnet,
+            testCallerAddress,
+          );
 
-        if (discarded) {
-          statistics.test!.discarded.set(
-            r.selectedTestFunction.name,
-            statistics.test!.discarded.get(r.selectedTestFunction.name)! + 1,
-          );
-          radio.emit(
-            "logMessage",
-            `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
-              `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
-              `${dim(testCallerWallet)} ` +
-              `${yellow("[WARN]")} ` +
-              `${targetContractName} ` +
-              `${underline(r.selectedTestFunction.name)} ` +
-              dim(printedTestFunctionArgs),
-          );
-        } else {
-          try {
+          if (discarded) {
+            statistics.test!.discarded.set(
+              r.selectedTestFunction.name,
+              statistics.test!.discarded.get(r.selectedTestFunction.name)! + 1,
+            );
+            radio.emit(
+              "logMessage",
+              `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
+                `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
+                `${dim(testCallerWallet)} ` +
+                `${yellow("[WARN]")} ` +
+                `${targetContractName} ` +
+                `${underline(r.selectedTestFunction.name)} ` +
+                dim(printedTestFunctionArgs),
+            );
+          } else {
             // If the function call results in a runtime error, the error will
             // be caught and logged as a test failure in the catch block.
             const { result: testFunctionCallResult } = simnet.callPrivateFn(
@@ -481,34 +481,42 @@ const propertyTest = async (
                 testFunctionCallClarityResult,
               );
             }
-          } catch (error: any) {
-            const displayedError =
-              error instanceof PropertyTestError
-                ? error.clarityError
-                : error &&
-                    typeof error === "string" &&
-                    error.toLowerCase().includes("runtime")
-                  ? "(runtime)"
-                  : "(unknown)";
-
-            // Capture the error and log the test failure.
-            radio.emit(
-              "logMessage",
-              red(
-                `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
-                  `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
-                  `${testCallerWallet} ` +
-                  `[FAIL] ` +
-                  `${targetContractName} ` +
-                  `${underline(r.selectedTestFunction.name)} ` +
-                  `${printedTestFunctionArgs} ` +
-                  displayedError,
-              ),
-            );
-
-            // Re-throw the error for fast-check to catch and process.
-            throw error;
           }
+        } catch (error: any) {
+          // Failures returned by the test are counted before the throw.
+          // Count runtime errors from the test or its discard function here.
+          if (!(error instanceof PropertyTestError)) {
+            statistics.test!.failed.set(
+              r.selectedTestFunction.name,
+              statistics.test!.failed.get(r.selectedTestFunction.name)! + 1,
+            );
+          }
+          const displayedError =
+            error instanceof PropertyTestError
+              ? error.clarityError
+              : error &&
+                  typeof error === "string" &&
+                  error.toLowerCase().includes("runtime")
+                ? "(runtime)"
+                : "(unknown)";
+
+          // Capture the error and log the test failure.
+          radio.emit(
+            "logMessage",
+            red(
+              `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
+                `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
+                `${testCallerWallet} ` +
+                `[FAIL] ` +
+                `${targetContractName} ` +
+                `${underline(r.selectedTestFunction.name)} ` +
+                `${printedTestFunctionArgs} ` +
+                displayedError,
+            ),
+          );
+
+          // Re-throw the error for fast-check to catch and process.
+          throw error;
         }
       },
     ),

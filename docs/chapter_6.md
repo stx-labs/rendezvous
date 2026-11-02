@@ -45,7 +45,8 @@ This chapter explains how to use Rendezvous in different situations. By the end,
 To run Rendezvous, use the following command:
 
 ```bash
-rv <path-to-clarinet-project> <contract-name> <type> [--config] [--seed] [--runs] [--regr] [--bail] [--dial]
+rv <path-to-clarinet-project> <contract-name> <type> \
+  [--config] [--seed] [--runs] [--regr] [--bail] [--fail-on-unchecked] [--dial]
 ```
 
 Let's break down each part of the command.
@@ -390,6 +391,8 @@ A config file is a JSON object with optional fields:
 | `regr`          | boolean          | Run regression tests only.                              |
 | `dial`          | string           | Path to custom dialers file.                            |
 
+`fail_on_unchecked` (boolean): Enable `--fail-on-unchecked`.
+
 The `accounts` field lets you define custom accounts for testing. By default (`"overwrite"` mode), these replace the Devnet.toml accounts entirely. With `"concatenate"` mode, config accounts are merged with the existing Devnet accounts — if a name appears in both, the config account's address takes precedence.
 
 Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like `"sedd"` instead of `"seed"`), and also warns if CLI flags are passed alongside `--config`.
@@ -407,6 +410,10 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 | `--bail`                     | Stop after the first failure.                                                    | `rv root contract test --bail`                    |
 | `--dial=<file>`              | Loads JavaScript dialers from a file for pre/post-processing.                    | `rv root contract test --dial=./custom-dialer.js` |
 | `--config=<file>`            | Uses a JSON config file for all run options.                                     | `rv root contract test --config=rv.config.json`   |
+
+`--fail-on-unchecked` fails for unchecked tests or invariants and for
+invariant campaigns where every public call throws. Example:
+`rv root contract test --fail-on-unchecked` (exit 1).
 
 ---
 
@@ -579,6 +586,13 @@ In this case, if `n <= 1`, the test **discards itself** by returning `(ok false)
 | **In-Place Discarding** | When discarding logic is simple and part of the test itself.      |
 
 In general, **in-place discarding is preferred** because it keeps test logic together and is easier to maintain. Use a **discard function** only when it's important to prevent execution entirely.
+
+Discarded cases do not count as checks. Rendezvous warns instead of printing
+a passing summary if any test has no passing case (all its cases were
+discarded or it was never selected), or an invariant was never selected.
+Invariant campaigns where every public call throws warn as inconclusive.
+Default exit codes are unchanged; `--fail-on-unchecked` (config key
+`fail_on_unchecked`) makes either warning fail the run with exit code 1.
 
 ## Custom Manifest Files
 

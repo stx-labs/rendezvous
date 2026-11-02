@@ -329,6 +329,7 @@ const invariantTest = async (
 
   const statistics: Statistics = {
     sut: {
+      thrown: 0,
       successful: new Map<string, number>(),
       failed: new Map<string, number>(),
     },
@@ -445,12 +446,18 @@ const invariantTest = async (
           }
 
           try {
-            const functionCall = simnet.callPublicFn(
-              r.rendezvousContractId,
-              selectedFunction.name,
-              r.selectedFunctionsArgsList[index],
-              sutCallerAddress,
-            );
+            let functionCall = null;
+            try {
+              functionCall = simnet.callPublicFn(
+                r.rendezvousContractId,
+                selectedFunction.name,
+                r.selectedFunctionsArgsList[index],
+                sutCallerAddress,
+              );
+            } catch (error) {
+              statistics.sut!.thrown++;
+              throw error;
+            }
 
             const functionCallResultJson = cvToJSON(functionCall.result);
 
@@ -468,19 +475,24 @@ const invariantTest = async (
                 selectedFunction.name,
                 statistics.sut!.successful.get(selectedFunction.name)! + 1,
               );
-              localContext[r.rendezvousContractId][selectedFunction.name]++;
+              const calls = ++localContext[r.rendezvousContractId][
+                selectedFunction.name
+              ];
 
-              simnet.callPrivateFn(
-                r.rendezvousContractId,
-                "update-context",
-                [
-                  Cl.stringAscii(selectedFunction.name),
-                  Cl.uint(
-                    localContext[r.rendezvousContractId][selectedFunction.name],
-                  ),
-                ],
-                simnet.deployer,
-              );
+              try {
+                simnet.callPrivateFn(
+                  r.rendezvousContractId,
+                  "update-context",
+                  [Cl.stringAscii(selectedFunction.name), Cl.uint(calls)],
+                  simnet.deployer,
+                );
+              } catch (error) {
+                radio.emit(
+                  "logInfo",
+                  `Could not update context for ${selectedFunction.name}: ` +
+                    String(error),
+                );
+              }
 
               // Function call passed.
               radio.emit(
@@ -531,6 +543,10 @@ const invariantTest = async (
             ) {
               throw error;
             } else {
+              statistics.sut!.failed.set(
+                selectedFunction.name,
+                statistics.sut!.failed.get(selectedFunction.name)! + 1,
+              );
               const displayedError =
                 error &&
                 typeof error === "string" &&
@@ -623,6 +639,10 @@ const invariantTest = async (
           // Log errors that aren't already handled as falsified invariants.
           // This prevents duplicate error messages for the same failure.
           if (!(error instanceof FalsifiedInvariantError)) {
+            statistics.invariant!.failed.set(
+              r.selectedInvariant.name,
+              statistics.invariant!.failed.get(r.selectedInvariant.name)! + 1,
+            );
             radio.emit(
               "logMessage",
               red(

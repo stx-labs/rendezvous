@@ -7,7 +7,7 @@ import { cvToJSON, cvToString, type ClarityValue } from "@stacks/transactions";
 import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
-import { reporter, trackFailureStatistics } from "./heatstroke";
+import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
 import { strategyFor } from "./lib";
 import {
@@ -394,9 +394,9 @@ const propertyTest = async (
           );
 
           if (discarded) {
-            statistics.test!.discarded.set(
+            incrementCount(
+              statistics.test!.discarded,
               r.selectedTestFunction.name,
-              statistics.test!.discarded.get(r.selectedTestFunction.name)! + 1,
             );
             radio.emit(
               "logMessage",
@@ -429,10 +429,9 @@ const propertyTest = async (
             );
 
             if (discardedInPlace) {
-              statistics.test!.discarded.set(
+              incrementCount(
+                statistics.test!.discarded,
                 r.selectedTestFunction.name,
-                statistics.test!.discarded.get(r.selectedTestFunction.name)! +
-                  1,
               );
               radio.emit(
                 "logMessage",
@@ -450,10 +449,9 @@ const propertyTest = async (
               testFunctionCallResultJson.success &&
               testFunctionCallResultJson.value.value === true
             ) {
-              statistics.test!.successful.set(
+              incrementCount(
+                statistics.test!.successful,
                 r.selectedTestFunction.name,
-                statistics.test!.successful.get(r.selectedTestFunction.name)! +
-                  1,
               );
               radio.emit(
                 "logMessage",
@@ -483,10 +481,7 @@ const propertyTest = async (
         } catch (error: any) {
           // Count failures returned by the test and runtime errors from the
           // test or its discard function.
-          statistics.test!.failed.set(
-            r.selectedTestFunction.name,
-            statistics.test!.failed.get(r.selectedTestFunction.name)! + 1,
-          );
+          incrementCount(statistics.test!.failed, r.selectedTestFunction.name);
           const displayedError =
             error instanceof PropertyTestError
               ? error.clarityError

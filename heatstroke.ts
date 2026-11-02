@@ -239,6 +239,15 @@ export const reporter = (
 };
 
 /**
+ * Increments the count for a function in a statistics map.
+ * @param counts The statistics map.
+ * @param name The function name.
+ */
+export const incrementCount = (counts: Map<string, number>, name: string) => {
+  counts.set(name, (counts.get(name) ?? 0) + 1);
+};
+
+/**
  * Keeps the statistics as they were at the first failure. Without bailing,
  * fast-check re-runs the predicate while shrinking, and those attempts would
  * otherwise be counted as test cases.

@@ -116,6 +116,16 @@ balance = 100000000000000
   }
 };
 
+/** Runs each case with and without bailing, which skips shrinking. */
+const withAndWithoutBail = (cases: [string, string][]) =>
+  cases.flatMap(([name, source]) =>
+    [true, false].map((bail): [string, string, boolean] => [
+      name,
+      source,
+      bail,
+    ]),
+  );
+
 describe("Property testing outcomes", () => {
   it.each([
     ["in-place discards", "(define-private (test-discard) (ok false))"],
@@ -156,24 +166,24 @@ describe("Property testing outcomes", () => {
     expect(result.logs).not.toContain("Warning: not checked");
   });
 
-  it.each([
-    ["an error result", "(define-private (test-fail) (err u1))"],
-    [
-      "a runtime error in the test",
-      "(define-private (test-fail) (ok (/ u1 u0)))",
-    ],
-    [
-      "a runtime error in the discard function",
-      "(define-read-only (can-test-fail) (is-eq (/ u1 u0) u0)) " +
-        "(define-private (test-fail) (ok true))",
-    ],
-  ])("counts %s as a single failure", async (_, source) => {
-    for (const bail of [true, false]) {
-      const result = await run(source, "test", bail);
-      expect(result.exitCode).toBe(1);
-      expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1/);
-      expect(result.persisted).toBe(1);
-    }
+  it.each(
+    withAndWithoutBail([
+      ["an error result", "(define-private (test-fail) (err u1))"],
+      [
+        "a runtime error in the test",
+        "(define-private (test-fail) (ok (/ u1 u0)))",
+      ],
+      [
+        "a runtime error in the discard function",
+        "(define-read-only (can-test-fail) (is-eq (/ u1 u0) u0)) " +
+          "(define-private (test-fail) (ok true))",
+      ],
+    ]),
+  )("counts %s as a single failure (bail: %j)", async (_, source, bail) => {
+    const result = await run(source, "test", bail);
+    expect(result.exitCode).toBe(1);
+    expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1/);
+    expect(result.persisted).toBe(1);
   });
 });
 
@@ -182,14 +192,17 @@ const context = `(define-map context (string-ascii 100) uint)
   (ok (map-set context name calls)))`;
 
 describe("Invariant testing outcomes", () => {
-  it.each([
-    ["a false result", "(define-read-only (invariant-fail) false)"],
-    [
-      "a runtime error",
-      "(define-read-only (invariant-fail) (is-eq (/ u1 u0) u0))",
-    ],
-  ])("counts %s as a single invariant failure", async (_, invariant) => {
-    for (const bail of [true, false]) {
+  it.each(
+    withAndWithoutBail([
+      ["a false result", "(define-read-only (invariant-fail) false)"],
+      [
+        "a runtime error",
+        "(define-read-only (invariant-fail) (is-eq (/ u1 u0) u0))",
+      ],
+    ]),
+  )(
+    "counts %s as a single invariant failure (bail: %j)",
+    async (_, invariant, bail) => {
       const result = await run(
         `${context} (define-public (touch) (ok true)) ${invariant}`,
         "invariant",
@@ -197,8 +210,8 @@ describe("Invariant testing outcomes", () => {
       );
       expect(result.exitCode).toBe(1);
       expect(result.logs).toMatch(/FAILED[\s│└─]*invariant-fail: x1/);
-    }
-  });
+    },
+  );
 
   it("stops the run when updating the context throws", async () => {
     const result = await run(

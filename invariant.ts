@@ -13,7 +13,7 @@ import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
 import { DialerRegistry, PostDialerError, PreDialerError } from "./dialer";
-import { reporter, trackFailureStatistics } from "./heatstroke";
+import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
 import type {
   InvariantTestConfig,
@@ -467,10 +467,7 @@ const invariantTest = async (
             );
 
             if (functionCallResultJson.success) {
-              statistics.sut!.successful.set(
-                selectedFunction.name,
-                statistics.sut!.successful.get(selectedFunction.name)! + 1,
-              );
+              incrementCount(statistics.sut!.successful, selectedFunction.name);
               const calls = ++localContext[r.rendezvousContractId][
                 selectedFunction.name
               ];
@@ -515,10 +512,7 @@ const invariantTest = async (
               }
             } else {
               // Function call failed.
-              statistics.sut!.failed.set(
-                selectedFunction.name,
-                statistics.sut!.failed.get(selectedFunction.name)! + 1,
-              );
+              incrementCount(statistics.sut!.failed, selectedFunction.name);
               radio.emit(
                 "logMessage",
                 dim(
@@ -541,10 +535,7 @@ const invariantTest = async (
               throw error;
             } else {
               statistics.sut!.thrown++;
-              statistics.sut!.failed.set(
-                selectedFunction.name,
-                statistics.sut!.failed.get(selectedFunction.name)! + 1,
-              );
+              incrementCount(statistics.sut!.failed, selectedFunction.name);
               const displayedError =
                 error &&
                 typeof error === "string" &&
@@ -590,10 +581,9 @@ const invariantTest = async (
           const invariantCallClarityResult = cvToString(invariantCallResult);
 
           if (invariantCallResultJson.value === true) {
-            statistics.invariant!.successful.set(
+            incrementCount(
+              statistics.invariant!.successful,
               r.selectedInvariant.name,
-              statistics.invariant!.successful.get(r.selectedInvariant.name)! +
-                1,
             );
             radio.emit(
               "logMessage",
@@ -630,9 +620,9 @@ const invariantTest = async (
             );
           }
         } catch (error: any) {
-          statistics.invariant!.failed.set(
+          incrementCount(
+            statistics.invariant!.failed,
             r.selectedInvariant.name,
-            statistics.invariant!.failed.get(r.selectedInvariant.name)! + 1,
           );
           // Log errors that aren't already handled as falsified invariants.
           // This prevents duplicate error messages for the same failure.

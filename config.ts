@@ -130,25 +130,14 @@ const validateConfig = (
     config.runs = obj.runs;
   }
 
-  if ("bail" in obj) {
-    if (typeof obj.bail !== "boolean") {
-      throw new Error(`"bail" must be a boolean.`);
+  for (const key of ["bail", "regr", "fail_on_unchecked"] as const) {
+    if (key in obj) {
+      const value = obj[key];
+      if (typeof value !== "boolean") {
+        throw new Error(`"${key}" must be a boolean.`);
+      }
+      config[key] = value;
     }
-    config.bail = obj.bail;
-  }
-
-  if ("regr" in obj) {
-    if (typeof obj.regr !== "boolean") {
-      throw new Error(`"regr" must be a boolean.`);
-    }
-    config.regr = obj.regr;
-  }
-
-  if ("fail_on_unchecked" in obj) {
-    if (typeof obj.fail_on_unchecked !== "boolean") {
-      throw new Error(`"fail_on_unchecked" must be a boolean.`);
-    }
-    config.fail_on_unchecked = obj.fail_on_unchecked;
   }
 
   if ("dial" in obj) {

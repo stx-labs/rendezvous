@@ -505,63 +505,66 @@ describe("Command-line arguments handling", () => {
   );
 });
 
-describe("Fail on unchecked tests", () => {
-  const initialArgv = process.argv;
+describe("Fail on unchecked", () => {
+  const cases = {
+    test: {
+      source: "(define-private (test-discard) (ok false))",
+      warning: "Warning: not checked after 20 runs: test-discard.",
+    },
+    invariant: {
+      source: `(define-private (update-context (name (string-ascii 100))
+                                       (calls uint)) (ok true))
+(define-public (explode) (ok (/ u1 u0)))
+(define-read-only (invariant-pass) true)`,
+      warning: "Warning: inconclusive after 20 runs: every public call threw.",
+    },
+  };
 
   it.each([
-    [[] as string[], false],
-    [["--fail-on-unchecked"], true],
-  ])(
-    "sets a failing exit code for unchecked tests only on request (%j)",
-    async (flags, fails) => {
-      // Setup: every case of the only test is discarded.
+    ["test", false],
+    ["test", true],
+    ["invariant", false],
+    ["invariant", true],
+  ] as const)(
+    "fails a %s run without checks only on request (%j)",
+    async (type, strict) => {
+      const { source, warning } = cases[type];
       const tempDir = createIsolatedTestEnvironment(
         resolve(__dirname, "example"),
         isolatedTestEnvPrefix,
       );
-      writeFileSync(
-        join(tempDir, "contracts/counter.clar"),
-        "(define-private (test-discard) (ok false))",
-      );
-      process.argv = [
-        "node",
-        "app.js",
-        tempDir,
-        "counter",
-        "test",
-        "--seed=3",
-        "--runs=40",
-        ...flags,
-      ];
-      const logs: string[] = [];
-      vi.spyOn(console, "log").mockImplementation((message: string) => {
-        logs.push(message);
-      });
-      vi.spyOn(console, "error").mockImplementation((message: string) => {
-        logs.push(message);
-      });
-      vi.spyOn(console, "info").mockImplementation((message: string) => {
-        logs.push(message);
-      });
+      const initialArgv = process.argv;
       const initialExitCode = process.exitCode;
-      process.exitCode = undefined;
-
       try {
-        // Exercise
+        writeFileSync(join(tempDir, "contracts/counter.clar"), source);
+        process.argv = [
+          "node",
+          "app.js",
+          tempDir,
+          "counter",
+          type,
+          "--seed=17",
+          "--runs=20",
+          ...(strict ? ["--fail-on-unchecked"] : []),
+        ];
+        const logs: string[] = [];
+        for (const method of ["log", "info", "error"] as const) {
+          vi.spyOn(console, method).mockImplementation((message: string) => {
+            logs.push(message);
+          });
+        }
+        process.exitCode = undefined;
+
         await main();
 
-        // Verify
+        const output = logs.join("\n");
+        expect(output).toContain(warning);
+        expect(output).not.toContain("passed after");
         expect(
-          logs.some((log) => log.includes("not checked after 40 runs")),
-        ).toBe(true);
-        expect(
-          logs.filter((log) =>
-            log.includes("Failing the run because of --fail-on-unchecked."),
-          ),
-        ).toHaveLength(fails ? 1 : 0);
-        expect(process.exitCode).toBe(fails ? 1 : undefined);
+          output.split("Failing the run because of --fail-on-unchecked."),
+        ).toHaveLength(strict ? 2 : 1);
+        expect(process.exitCode).toBe(strict ? 1 : undefined);
       } finally {
-        // Teardown
         process.exitCode = initialExitCode;
         process.argv = initialArgv;
         vi.restoreAllMocks();
@@ -569,54 +572,6 @@ describe("Fail on unchecked tests", () => {
       }
     },
   );
-});
-
-describe("Inconclusive invariant campaigns", () => {
-  it.each([false, true])("fails only in strict mode (%j)", async (strict) => {
-    const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
-      isolatedTestEnvPrefix,
-    );
-    const initialArgv = process.argv;
-    const initialExitCode = process.exitCode;
-    try {
-      writeFileSync(
-        join(tempDir, "contracts/counter.clar"),
-        `(define-private (update-context (name (string-ascii 100))
-                                       (calls uint)) (ok true))
-(define-public (explode) (ok (/ u1 u0)))
-(define-read-only (invariant-pass) true)`,
-      );
-      process.argv = [
-        "node",
-        "app.js",
-        tempDir,
-        "counter",
-        "invariant",
-        "--seed=17",
-        "--runs=20",
-        ...(strict ? ["--fail-on-unchecked"] : []),
-      ];
-      const logs: string[] = [];
-      for (const method of ["log", "info", "error"] as const) {
-        vi.spyOn(console, method).mockImplementation((message: string) => {
-          logs.push(message);
-        });
-      }
-      process.exitCode = undefined;
-      await main();
-      expect(logs.join("\n")).toContain(
-        "Warning: inconclusive after 20 runs: every public call threw.",
-      );
-      expect(logs.join("\n")).not.toContain("OK, invariants passed");
-      expect(process.exitCode).toBe(strict ? 1 : undefined);
-    } finally {
-      process.exitCode = initialExitCode;
-      process.argv = initialArgv;
-      vi.restoreAllMocks();
-      rmSync(tempDir, { recursive: true, force: true });
-    }
-  });
 });
 
 describe("Contract selection", () => {

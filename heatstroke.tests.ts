@@ -804,11 +804,11 @@ describe("Custom reporter logging", () => {
 describe("Unchecked tests and invariants reporting", () => {
   const report = (type: "test" | "invariant", checks: [string, number][]) => {
     const logs: string[] = [];
-    const unchecked: string[][] = [];
+    let unchecked = 0;
     const radio = new EventEmitter();
     radio.on("logMessage", (message: string) => logs.push(message));
     radio.on("logInfo", (message: string) => logs.push(message));
-    radio.on("unchecked", (names: string[]) => unchecked.push(names));
+    radio.on("unchecked", () => unchecked++);
     const zero = new Map(checks.map(([name]) => [name, 0]));
     const counts = { successful: new Map(checks), failed: zero };
     const originalExitCode = process.exitCode;
@@ -841,7 +841,7 @@ describe("Unchecked tests and invariants reporting", () => {
         "They were never selected or all of their cases were discarded.",
     );
     expect(logs).not.toContain("OK, properties passed");
-    expect(unchecked).toEqual([["test-b"]]);
+    expect(unchecked).toBe(1);
     expect(exitCodeChanged).toBe(false);
   });
 
@@ -860,9 +860,9 @@ describe("Unchecked tests and invariants reporting", () => {
   it("reports a pass when every test and invariant was checked", () => {
     const test = report("test", [["test-a", 5]]);
     expect(test.logs).toContain("OK, properties passed after 5 runs.");
-    expect(test.unchecked).toEqual([]);
+    expect(test.unchecked).toBe(0);
     const invariant = report("invariant", [["invariant-a", 5]]);
     expect(invariant.logs).toContain("OK, invariants passed after 5 runs.");
-    expect(invariant.unchecked).toEqual([]);
+    expect(invariant.unchecked).toBe(0);
   });
 });

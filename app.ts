@@ -80,15 +80,13 @@ export const main = async () => {
 
   logWarnings(radio, runConfig.warnings);
 
-  // Unchecked tests and inconclusive campaigns fail only on request. Both
-  // can fire, and once per regression, so fail once after the run.
-  let uncheckedOrInconclusive = false;
+  // Unchecked tests and inconclusive campaigns fail only on request. The
+  // event can fire once per regression, so fail once after the run.
+  let unchecked = false;
   if (runConfig.failOnUnchecked) {
-    for (const event of ["unchecked", "inconclusive"]) {
-      radio.on(event, () => {
-        uncheckedOrInconclusive = true;
-      });
-    }
+    radio.on("unchecked", () => {
+      unchecked = true;
+    });
   }
 
   const manifestPath = join(
@@ -176,7 +174,7 @@ export const main = async () => {
     }
   }
 
-  if (uncheckedOrInconclusive) {
+  if (unchecked) {
     radio.emit(
       "logFailure",
       "Failing the run because of --fail-on-unchecked.\n",

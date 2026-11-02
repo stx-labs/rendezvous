@@ -607,10 +607,6 @@ const invariantTest = async (
                 green(invariantCallClarityResult),
             );
           } else {
-            statistics.invariant!.failed.set(
-              r.selectedInvariant.name,
-              statistics.invariant!.failed.get(r.selectedInvariant.name)! + 1,
-            );
             radio.emit(
               "logMessage",
               red(
@@ -634,13 +630,13 @@ const invariantTest = async (
             );
           }
         } catch (error: any) {
+          statistics.invariant!.failed.set(
+            r.selectedInvariant.name,
+            statistics.invariant!.failed.get(r.selectedInvariant.name)! + 1,
+          );
           // Log errors that aren't already handled as falsified invariants.
           // This prevents duplicate error messages for the same failure.
           if (!(error instanceof FalsifiedInvariantError)) {
-            statistics.invariant!.failed.set(
-              r.selectedInvariant.name,
-              statistics.invariant!.failed.get(r.selectedInvariant.name)! + 1,
-            );
             radio.emit(
               "logMessage",
               red(

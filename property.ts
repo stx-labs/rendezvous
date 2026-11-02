@@ -471,10 +471,6 @@ const propertyTest = async (
                 simnet.mineEmptyBurnBlocks(r.burnBlocks);
               }
             } else {
-              statistics.test!.failed.set(
-                r.selectedTestFunction.name,
-                statistics.test!.failed.get(r.selectedTestFunction.name)! + 1,
-              );
               // The function call did not result in (ok true) or (ok false).
               // Either the test failed or the test function returned an
               // unexpected value i.e. `(ok 1)`.
@@ -485,14 +481,12 @@ const propertyTest = async (
             }
           }
         } catch (error: any) {
-          // Failures returned by the test are counted before the throw.
-          // Count runtime errors from the test or its discard function here.
-          if (!(error instanceof PropertyTestError)) {
-            statistics.test!.failed.set(
-              r.selectedTestFunction.name,
-              statistics.test!.failed.get(r.selectedTestFunction.name)! + 1,
-            );
-          }
+          // Count failures returned by the test and runtime errors from the
+          // test or its discard function.
+          statistics.test!.failed.set(
+            r.selectedTestFunction.name,
+            statistics.test!.failed.get(r.selectedTestFunction.name)! + 1,
+          );
           const displayedError =
             error instanceof PropertyTestError
               ? error.clarityError

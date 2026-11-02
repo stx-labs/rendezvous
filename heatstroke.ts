@@ -193,13 +193,13 @@ export const reporter = (
       .filter(([, count]) => count === 0)
       .map(([name]) => name);
 
+    // Only invariant runs call public functions.
     const sut = statistics.sut;
     const allCallsThrew =
-      type === "invariant" &&
       sut !== undefined &&
       sut.thrown > 0 &&
-      computeTotalCount(sut.successful) === 0 &&
-      sut.thrown === computeTotalCount(sut.failed);
+      sut.thrown ===
+        computeTotalCount(sut.successful) + computeTotalCount(sut.failed);
 
     if (allCallsThrew) {
       radio.emit(
@@ -207,7 +207,6 @@ export const reporter = (
         `\nWarning: inconclusive after ${numRuns} runs: ` +
           "every public call threw.\n",
       );
-      radio.emit("inconclusive");
     }
 
     if (unchecked.length > 0) {
@@ -220,8 +219,11 @@ export const reporter = (
         `\nWarning: not checked after ${numRuns} runs: ` +
           `${unchecked.join(", ")}.\n${reason}\n`,
       );
-      radio.emit("unchecked", unchecked);
-    } else if (!allCallsThrew) {
+    }
+
+    if (allCallsThrew || unchecked.length > 0) {
+      radio.emit("unchecked");
+    } else {
       radio.emit(
         "logMessage",
         green(

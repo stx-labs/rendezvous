@@ -19,7 +19,7 @@ Run your harness's general review pass if it's available to you: the `code-revie
 
 Report only defects the change introduces or exposes
 
-Formatting and lint findings are the responsibility of other tools are mostly outside the scope of this review. If there are any findings, note it as a single minor violation, but do not list the findings individually.
+Formatting and lint findings are the responsibility of other tools and are mostly outside the scope of this review. If there are any findings, note it as a single minor violation, but do not list the findings individually.
 
 Check each finding against the surrounding code before reporting it. Drop the ones that don't hold up.
 

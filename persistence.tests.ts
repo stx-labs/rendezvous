@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -410,89 +410,80 @@ describe("Failure Persistence", () => {
       );
     });
 
-    it("persists the counterexample path", () => {
-      const customBaseDir = createTemporaryCustomTestBaseDir("paths");
-      const options = { baseDir: customBaseDir };
+    it("includes the counterexample path in the failure record", () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            customBaseDirName: fc.stringMatching(fileNameRegex),
+            seed: fc.integer(),
+            counterexamplePath: fc.string(),
+          }),
+          ({ customBaseDirName, seed, counterexamplePath }) => {
+            // Setup
+            const runDetails = {
+              ...createMockRunDetails(seed),
+              counterexamplePath,
+            };
+            const customBaseDir =
+              createTemporaryCustomTestBaseDir(customBaseDirName);
 
-      try {
-        persistFailure(
-          { ...createMockRunDetails(1), counterexamplePath: "0:1" },
-          "test",
-          TEST_CONTRACT_ID,
-          undefined,
-          options,
-        );
+            // Exercise
+            persistFailure(runDetails, "test", TEST_CONTRACT_ID, undefined, {
+              baseDir: customBaseDir,
+            });
 
-        const [failure] = loadFailures(TEST_CONTRACT_ID, "test", options);
-        expect(failure.counterexamplePath).toBe("0:1");
-      } finally {
-        rmSync(customBaseDir, { recursive: true, force: true });
-      }
-    });
+            // Verify
+            const failures = loadFailures(TEST_CONTRACT_ID, "test", {
+              baseDir: customBaseDir,
+            });
+            expect(failures[0].counterexamplePath).toBe(counterexamplePath);
 
-    it("backfills the path on a record saved without one", () => {
-      const customBaseDir = createTemporaryCustomTestBaseDir("backfill");
-      const options = { baseDir: customBaseDir };
-      const record = { seed: 17, numRuns: 100, timestamp: 123 };
-
-      try {
-        writeFileSync(
-          getFailureFilePath(TEST_CONTRACT_ID, customBaseDir),
-          JSON.stringify({ invariant: [], test: [record] }),
-        );
-
-        persistFailure(
-          { ...createMockRunDetails(17), counterexamplePath: "2:1:0" },
-          "test",
-          TEST_CONTRACT_ID,
-          undefined,
-          options,
-        );
-        persistFailure(
-          { ...createMockRunDetails(17), counterexamplePath: "9:9" },
-          "test",
-          TEST_CONTRACT_ID,
-          undefined,
-          options,
-        );
-
-        expect(loadFailures(TEST_CONTRACT_ID, "test", options)).toEqual([
-          { ...record, counterexamplePath: "2:1:0" },
-        ]);
-      } finally {
-        rmSync(customBaseDir, { recursive: true, force: true });
-      }
+            // Teardown
+            rmSync(customBaseDir, { recursive: true, force: true });
+          },
+        ),
+      );
     });
 
     it.each([
-      ["run count", { numRuns: 20 }, undefined],
-      ["dialer", { numRuns: 100, dial: "a.cjs" }, "b.cjs"],
-    ])("does not backfill the path when the %s differs", (_, saved, dial) => {
-      const customBaseDir = createTemporaryCustomTestBaseDir("mismatch");
-      const options = { baseDir: customBaseDir };
-      const record = { seed: 17, timestamp: 123, ...saved };
-
-      try {
-        writeFileSync(
-          getFailureFilePath(TEST_CONTRACT_ID, customBaseDir),
-          JSON.stringify({ invariant: [record], test: [] }),
+      ["backfills a missing path", undefined, 100, undefined, "2:1:0"],
+      ["keeps a saved path", "0:1", 100, undefined, "0:1"],
+      ["skips a different run count", undefined, 20, undefined, undefined],
+      ["skips a different dialer", undefined, 100, "a.cjs", undefined],
+    ])(
+      "%s when the seed is already saved",
+      (name, savedPath, savedNumRuns, savedDial, expectedPath) => {
+        // Setup
+        const options = { baseDir: createTemporaryCustomTestBaseDir(name) };
+        persistFailure(
+          {
+            ...createMockRunDetails(17, true, savedNumRuns),
+            counterexamplePath: savedPath,
+          },
+          "invariant",
+          TEST_CONTRACT_ID,
+          savedDial,
+          options,
         );
 
+        // Exercise
         persistFailure(
           { ...createMockRunDetails(17), counterexamplePath: "2:1:0" },
           "invariant",
           TEST_CONTRACT_ID,
-          dial,
+          undefined,
           options,
         );
 
-        expect(loadFailures(TEST_CONTRACT_ID, "invariant", options)).toEqual([
-          record,
-        ]);
-      } finally {
-        rmSync(customBaseDir, { recursive: true, force: true });
-      }
-    });
+        // Verify
+        const failures = loadFailures(TEST_CONTRACT_ID, "invariant", options);
+        expect(failures).toHaveLength(1);
+        expect(failures[0].counterexamplePath).toBe(expectedPath);
+
+        // Teardown
+        rmSync(options.baseDir, { recursive: true, force: true });
+      },
+    );
   });
 
   describe("Loading Failures", () => {

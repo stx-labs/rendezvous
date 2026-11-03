@@ -343,10 +343,7 @@ Each failure record includes:
 - `numRuns` – Number of test iterations needed for the failure to occur
 - `timestamp` – When the failure was discovered (Unix timestamp in milliseconds)
 - `dial` (optional) – Path to the dialer file used during the test
-- `counterexamplePath` (optional) – fast-check shrink metadata for diagnostics;
-  it is not an exact replay trace. A regression run adds it to a record saved
-  without one when the replay fails after the same number of runs and with the
-  same dialer, so the regression file can change after a regression run.
+- `counterexamplePath` (optional) – The fast-check path to the counterexample, kept for diagnostics. Regression runs replay from the seed, not from this path. A regression run adds the path to a record saved without one when the replay fails after the same number of runs and with the same dialer, so the regression file can change after a regression run.
 
 Failures are sorted by timestamp in descending order, with the most recent failures first.
 

@@ -11,7 +11,7 @@ interface FailureRecord {
   seed: number;
   /** The number of runs needed to reproduce the failure*/
   numRuns: number;
-  /** The fast-check path to the counterexample */
+  /** The fast-check path to the counterexample, kept for diagnostics */
   counterexamplePath?: string;
   /** The path to the dialer file used for this test run */
   dial: string | undefined;

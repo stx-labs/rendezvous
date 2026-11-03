@@ -382,7 +382,6 @@ describe("Custom reporter logging", () => {
       fc.assert(
         fc.property(
           fc.record({
-            counterexamplePath: asciiString(),
             failed: fc.constant(false),
             numRuns: fc.nat(),
             seed: fc.nat(),
@@ -422,7 +421,6 @@ describe("Custom reporter logging", () => {
             ),
           }),
           (r: {
-            counterexamplePath: string;
             failed: boolean;
             numRuns: number;
             seed: number;
@@ -454,7 +452,6 @@ describe("Custom reporter logging", () => {
             });
 
             const runDetails = {
-              counterexamplePath: r.counterexamplePath,
               failed: r.failed,
               numRuns: r.numRuns,
               seed: r.seed,

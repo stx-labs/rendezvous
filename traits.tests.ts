@@ -6,7 +6,9 @@ import type {
   ContractInterfaceFunction,
   IContractAST,
 } from "@stacks/clarinet-sdk-wasm";
+import fc from "fast-check";
 
+import { strategyFor } from "./lib";
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
 import { createIsolatedTestEnvironment } from "./test.utils";
 import {
@@ -1914,8 +1916,26 @@ describe("Trait reference processing", () => {
                     },
                     {
                       name: "token",
-                      // Private functions are not picked for generation.
-                      type: "trait_reference",
+                      type: {
+                        trait_reference: {
+                          name: "ft-trait",
+                          import: {
+                            Imported: {
+                              name: "sip-010-trait",
+                              contract_identifier: {
+                                name: "sip-010-trait-ft-standard",
+                                issuer: [
+                                  22,
+                                  [
+                                    9, 159, 184, 137, 38, 216, 47, 48, 178, 244,
+                                    14, 175, 62, 228, 35, 203, 114, 91, 219, 59,
+                                  ],
+                                ],
+                              },
+                            },
+                          },
+                        },
+                      },
                     },
                   ],
                 },
@@ -2106,8 +2126,26 @@ describe("Trait reference processing", () => {
                     },
                     {
                       name: "token",
-                      // Private functions are not picked for generation.
-                      type: "trait_reference",
+                      type: {
+                        trait_reference: {
+                          name: "ft-trait",
+                          import: {
+                            Imported: {
+                              name: "sip-010-trait",
+                              contract_identifier: {
+                                name: "sip-010-trait-ft-standard",
+                                issuer: [
+                                  22,
+                                  [
+                                    9, 159, 184, 137, 38, 216, 47, 48, 178, 244,
+                                    14, 175, 62, 228, 35, 203, 114, 91, 219, 59,
+                                  ],
+                                ],
+                              },
+                            },
+                          },
+                        },
+                      },
                     },
                   ],
                 },
@@ -2392,6 +2430,47 @@ describe("Trait reference processing", () => {
 
     // Verify
     expect(actual).toEqual(expected);
+
+    // Teardown
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("enriches private test functions with trait reference data so their arguments can be generated", async () => {
+    // Setup
+    const tempDir = createIsolatedTestEnvironment(
+      resolve(__dirname, "example"),
+      isolatedTestEnvPrefix,
+    );
+    const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
+
+    const contractId = `${simnet.deployer}.send-tokens`;
+    const testFunctions = simnet
+      .getContractsInterfaces()
+      .get(contractId)!
+      .functions.filter(
+        (f) => f.access === "private" && f.name.startsWith("test-"),
+      );
+    const traitReferenceMap = buildTraitReferenceMap(testFunctions);
+
+    // Exercise
+    const enriched = enrichInterfaceWithTraitData(
+      simnet.getContractAST("send-tokens"),
+      traitReferenceMap,
+      testFunctions,
+      contractId,
+    );
+    const testTransfer = enriched
+      .get(contractId)!
+      .find((f) => f.name === "test-transfer")!;
+
+    // Verify
+    expect(testTransfer.args[0].type).toEqual({
+      trait_reference: expect.objectContaining({ name: "ft-trait" }),
+    });
+    const [[token]] = fc.sample(strategyFor(simnet, testTransfer), 1);
+    expect(token).toEqual(
+      expect.objectContaining({ type: "contract", value: expect.any(String) }),
+    );
 
     // Teardown
     rmSync(tempDir, { recursive: true, force: true });

@@ -177,7 +177,7 @@ importers:
         version: 2.0.3
       fast-check:
         specifier: ^4.5.3
-        version: 4.5.3
+        version: 4.10.2
     devDependencies:
       '@ianvs/prettier-plugin-sort-imports':
         specifier: ^4.7.1
@@ -743,8 +743,8 @@ packages:
     resolution: {integrity: sha512-knvyeauYhqjOYvQ66MznSMs83wmHrCycNEN6Ao+2AeYEfxUIkuiVxdEa1qlGEPK+We3n0THiDciYSsCcgW/DoA==}
     engines: {node: '>=12.0.0'}
 
-  fast-check@4.5.3:
-    resolution: {integrity: sha512-IE9csY7lnhxBnA8g/WI5eg/hygA6MGWJMSNfFRrBlXUciADEhS1EDB0SIsMSvzubzIlOBbVITSsypCsW717poA==}
+  fast-check@4.10.2:
+    resolution: {integrity: sha512-iK2f+YrcmoeGqk6fA0ea2bptcu/itMIm4NfEozq6N25+aG6h7s5HZbB/k1aV7b5w5sFLMCbbtRUsTVR+BgC3xw==}
     engines: {node: '>=12.17.0'}
 
   fdir@6.5.0:
@@ -1013,8 +1013,8 @@ packages:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
     engines: {node: '>= 6'}
 
-  pure-rand@7.0.1:
-    resolution: {integrity: sha512-oTUZM/NAZS8p7ANR3SHh30kXB+zK2r2BPcEn/awJIbOvq82WoMN4p62AWWp3Hhw50G0xMsw1mhIBLqHw64EcNQ==}
+  pure-rand@8.4.2:
+    resolution: {integrity: sha512-vvuOGgcuPJAirlHvuQw1TrOiw7ptaIXXmIbNuiNOY6lNGJJH49PQ1Kj4nd783nPdQhQdicgOjVI2yI/9BD6/Ng==}
 
   readdirp@3.6.0:
     resolution: {integrity: sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA==}
@@ -1484,7 +1484,7 @@ snapshots:
       '@stacks/clarinet-sdk': 3.20.0
       '@stacks/transactions': 7.4.0
       ansicolor: 2.0.3
-      fast-check: 4.5.3
+      fast-check: 4.10.2
     transitivePeerDependencies:
       - encoding
 
@@ -1697,9 +1697,9 @@ snapshots:
 
   expect-type@1.3.0: {}
 
-  fast-check@4.5.3:
+  fast-check@4.10.2:
     dependencies:
-      pure-rand: 7.0.1
+      pure-rand: 8.4.2
 
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
@@ -1906,7 +1906,7 @@ snapshots:
       kleur: 3.0.3
       sisteransi: 1.0.5
 
-  pure-rand@7.0.1: {}
+  pure-rand@8.4.2: {}
 
   readdirp@3.6.0:
     dependencies:

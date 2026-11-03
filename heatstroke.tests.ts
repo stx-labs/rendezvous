@@ -290,6 +290,7 @@ describe("Custom reporter logging", () => {
             });
 
             const runDetails = {
+              counterexamplePath: `${r.path}:preferred`,
               path: r.path,
               failed: r.failed,
               numRuns: r.numRuns,
@@ -320,7 +321,7 @@ describe("Custom reporter logging", () => {
             const expectedMessages = [
               `\nError: Property failed after ${r.numRuns} tests.`,
               `Seed : ${r.seed}`,
-              `Path : ${r.path}`,
+              `Path : ${r.path}:preferred`,
               `\nCounterexample:`,
               `- Contract : ${getContractNameFromContractId(
                 rendezvousContractId,

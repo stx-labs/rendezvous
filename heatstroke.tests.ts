@@ -7,7 +7,7 @@ import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import { Cl, cvToString, type ClarityValue } from "@stacks/transactions";
 import fc from "fast-check";
 
-import { reporter } from "./heatstroke";
+import { reporter, trackFailureStatistics } from "./heatstroke";
 import { FalsifiedInvariantError } from "./invariant";
 import { PropertyTestError } from "./property";
 import { getContractNameFromContractId } from "./shared";
@@ -798,5 +798,127 @@ describe("Custom reporter logging", () => {
         { numRuns: 10 },
       );
     });
+  });
+});
+
+describe("Unchecked tests and invariants reporting", () => {
+  const report = (type: "test" | "invariant", checks: [string, number][]) => {
+    const logs: string[] = [];
+    let unchecked = 0;
+    const radio = new EventEmitter();
+    radio.on("logMessage", (message: string) => logs.push(message));
+    radio.on("logInfo", (message: string) => logs.push(message));
+    radio.on("unchecked", () => unchecked++);
+    const zero = new Map(checks.map(([name]) => [name, 0]));
+    const counts = { successful: new Map(checks), failed: zero };
+    const originalExitCode = process.exitCode;
+    try {
+      reporter(
+        { failed: false, counterexample: [], numRuns: 5, seed: 1 },
+        radio,
+        type,
+        type === "test"
+          ? { test: { ...counts, discarded: zero } }
+          : { invariant: counts, sut: { ...counts, thrown: 0 } },
+      );
+      return {
+        logs: logs.join("\n"),
+        unchecked,
+        exitCodeChanged: process.exitCode !== originalExitCode,
+      };
+    } finally {
+      process.exitCode = originalExitCode;
+    }
+  };
+
+  it("warns instead of passing when a test has no passing checks", () => {
+    const { logs, unchecked, exitCodeChanged } = report("test", [
+      ["test-a", 5],
+      ["test-b", 0],
+    ]);
+    expect(logs).toContain(
+      "Warning: not checked after 5 runs: test-b.\n" +
+        "They were never selected or all of their cases were discarded.",
+    );
+    expect(logs).not.toContain("OK, properties passed");
+    expect(unchecked).toBe(1);
+    expect(exitCodeChanged).toBe(false);
+  });
+
+  it("warns instead of passing when an invariant was never selected", () => {
+    const { logs } = report("invariant", [
+      ["invariant-a", 5],
+      ["invariant-b", 0],
+    ]);
+    expect(logs).toContain(
+      "Warning: not checked after 5 runs: invariant-b.\n" +
+        "They were never selected.",
+    );
+    expect(logs).not.toContain("OK, invariants passed");
+  });
+
+  it("reports a pass when every test and invariant was checked", () => {
+    const test = report("test", [["test-a", 5]]);
+    expect(test.logs).toContain("OK, properties passed after 5 runs.");
+    expect(test.unchecked).toBe(0);
+    const invariant = report("invariant", [["invariant-a", 5]]);
+    expect(invariant.logs).toContain("OK, invariants passed after 5 runs.");
+    expect(invariant.unchecked).toBe(0);
+  });
+});
+
+describe("Failure statistics tracking", () => {
+  it("keeps counting after a skipped precondition", async () => {
+    const statistics = {
+      test: {
+        successful: new Map([["test-a", 0]]),
+        discarded: new Map([["test-a", 0]]),
+        failed: new Map([["test-a", 0]]),
+      },
+    };
+    const tracked = trackFailureStatistics(statistics);
+    let calls = 0;
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constant(0),
+        tracked.track(async () => {
+          fc.pre(calls++ > 0);
+          statistics.test.successful.set(
+            "test-a",
+            statistics.test.successful.get("test-a")! + 1,
+          );
+        }),
+      ),
+      { numRuns: 3 },
+    );
+    expect(tracked.get().test!.successful.get("test-a")).toBe(3);
+  });
+
+  it("keeps the statistics from the first failure", async () => {
+    const statistics = {
+      test: {
+        successful: new Map([["test-a", 0]]),
+        discarded: new Map([["test-a", 0]]),
+        failed: new Map([["test-a", 0]]),
+      },
+    };
+    const tracked = trackFailureStatistics(statistics);
+    await expect(
+      fc.assert(
+        fc.asyncProperty(
+          fc.nat(),
+          tracked.track(async () => {
+            statistics.test.failed.set(
+              "test-a",
+              statistics.test.failed.get("test-a")! + 1,
+            );
+            throw new Error("fail");
+          }),
+        ),
+        { numRuns: 3, seed: 1 },
+      ),
+    ).rejects.toThrow();
+    expect(statistics.test.failed.get("test-a")).toBeGreaterThan(1);
+    expect(tracked.get().test!.failed.get("test-a")).toBe(1);
   });
 });

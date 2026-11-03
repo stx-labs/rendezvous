@@ -515,10 +515,10 @@ Valid Cases and Expected Behavior:
 
 #### Checking the properties
 
-To run Rendezvous property-based tests against the `reverse` contract, use:
+To run Rendezvous property-based tests against the `slice` contract, use:
 
 ```bash
-rv ./example slice test
+rv ./example slice test --seed=17 --runs=100
 ```
 
 **Discarding at its finest**

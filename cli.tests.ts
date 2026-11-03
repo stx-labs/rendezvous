@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -45,6 +45,47 @@ describe("CLI parsing with parseCli", () => {
     expect(config.bail).toBe(true);
     expect(config.regr).toBe(true);
     expect(config.dial).toBe("./dialers.cjs");
+  });
+
+  it("parses --fail-on-unchecked and defaults it to false", () => {
+    expect(
+      parseCli(["./example", "slice", "test", "--fail-on-unchecked"])!
+        .failOnUnchecked,
+    ).toBe(true);
+    expect(parseCli(["./example", "slice", "test"])!.failOnUnchecked).toBe(
+      false,
+    );
+  });
+
+  it("reads fail_on_unchecked from the config file", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "rendezvous-test-fail-on-unchecked-"),
+    );
+    const configPath = join(tempDir, "rv.config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({ fail_on_unchecked: true }),
+      "utf-8",
+    );
+    try {
+      const config = parseCli([
+        "./example",
+        "slice",
+        "test",
+        `--config=${configPath}`,
+      ])!;
+      expect(config.failOnUnchecked).toBe(true);
+      const ignored = parseCli([
+        "./example",
+        "slice",
+        "test",
+        `--config=${configPath}`,
+        "--fail-on-unchecked",
+      ])!;
+      expect(ignored.warnings.join("\n")).toContain("--fail-on-unchecked");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it("normalizes type to lowercase", () => {

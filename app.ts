@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
-import { red, yellow } from "ansicolor";
 
 import {
   helpMessage,
@@ -13,6 +12,7 @@ import {
   parseCli,
   type RunConfig,
 } from "./cli";
+import { red, yellow } from "./colors";
 import { resolveAccounts } from "./config";
 import { checkInvariants } from "./invariant";
 import { checkProperties } from "./property";

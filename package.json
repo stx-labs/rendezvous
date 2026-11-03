@@ -46,11 +46,13 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "dependencies": {
     "@stacks/clarinet-sdk": "^3.26.0",
     "@stacks/clarinet-sdk-wasm": "^3.26.0",
     "@stacks/transactions": "^7.6.0",
-    "ansicolor": "^2.0.3",
     "fast-check": "^4.10.2"
   },
   "devDependencies": {

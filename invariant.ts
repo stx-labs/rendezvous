@@ -9,9 +9,9 @@ import {
   cvToString,
   type ClarityValue,
 } from "@stacks/transactions";
-import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
+import { dim, green, red, underline, yellow } from "./colors";
 import { DialerRegistry, PostDialerError, PreDialerError } from "./dialer";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";

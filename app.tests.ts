@@ -2,10 +2,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { red } from "ansicolor";
-
 import { getManifestFileName, main } from "./app";
 import { helpMessage } from "./cli";
+import { red } from "./colors";
 import { getFailureFilePath } from "./persistence";
 import { LOG_DIVIDER } from "./shared";
 import { createIsolatedTestEnvironment } from "./test.utils";

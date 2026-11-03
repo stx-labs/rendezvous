@@ -34,7 +34,7 @@ This chapter covers how to install Rendezvous and set up your environment for ef
 
 Before installing Rendezvous, ensure you have the following prerequisites:
 
-- **Node.js**: Rendezvous supports the Node.js versions that [`@stacks/clarinet-sdk`](https://www.npmjs.com/package/@stacks/clarinet-sdk) supports, and is tested on Node.js 22 and 24.
+- **Node.js**: Rendezvous requires Node.js 22.13.0 or later, and is tested on Node.js 22 and 24.
 - **Clarinet**: You need a Clarinet project to use Rendezvous. If you don't have Clarinet installed, follow the [official Clarinet installation guide](https://github.com/stx-labs/clarinet).
 
 ## Standard Installation
@@ -132,7 +132,7 @@ my-project/
 
 **Node.js Version Conflicts**
 
-If you encounter errors related to Node.js versions, ensure you're using a version supported by `@stacks/clarinet-sdk`.
+If you encounter errors related to Node.js versions, ensure you're using Node.js 22.13.0 or later.
 
 ```bash
 node --version

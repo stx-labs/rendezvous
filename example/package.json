@@ -15,7 +15,7 @@
     "@stacks/clarinet-sdk": "^3.20.0",
     "@stacks/rendezvous": "^1.0.3",
     "@stacks/transactions": "^7.4.0",
-    "@types/node": "^24.10.0",
+    "@types/node": "^26.6.6",
     "chokidar-cli": "^3.0.0",
     "vitest": "^4.0.8",
     "vitest-environment-clarinet": "^3.0.1"

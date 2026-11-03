@@ -15,7 +15,7 @@ Pin down the intent from the PR description or commit messages. A change that co
 
 ## Review
 
-Run your harness's general review pass if it's available to you: the `code-review` skill in Claude Code, `codex review` in Codex (it reviews the current checkout). Otherwise, review inline.
+Run your harness's general review pass if it's available to you: the `code-review` skill in Claude Code, `codex review` in Codex. Pass the selected scope explicitly (for example, `--base master` or `--commit <sha>` for Codex), and review any uncovered portion inline. If no general review pass is available, review inline.
 
 Report only defects the change introduces or exposes
 

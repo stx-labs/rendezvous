@@ -416,6 +416,17 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 | `--config=<file>`            | Uses a JSON config file for all run options.                                            | `rv root contract test --config=rv.config.json`   |
 | `--fail-on-unchecked`        | Exits with code 1 when a test or invariant goes unchecked, or every public call throws. | `rv root contract test --fail-on-unchecked`       |
 
+### Colored Output
+
+Rendezvous colors its output only when writing to a terminal, so redirected or piped output is plain text. It follows the standard environment variables:
+
+- `NO_COLOR=1` disables colors.
+- `FORCE_COLOR=1` enables colors even when the output is not a terminal, for example in CI logs:
+
+```bash
+FORCE_COLOR=1 rv root contract test
+```
+
 ---
 
 ## Understanding Rendezvous

@@ -1,12 +1,12 @@
 import { styleText } from "node:util";
 
 /**
- * Wraps text in the ANSI escape codes for the given style. Codes are always
- * emitted, whether or not the output stream is a terminal.
+ * Styles text for stdout. Colors are applied only when stdout is a terminal,
+ * and follow `NO_COLOR`, `NODE_DISABLE_COLORS` and `FORCE_COLOR`.
  */
 const style =
   (format: Parameters<typeof styleText>[0]) => (text: string | number) =>
-    styleText(format, String(text), { validateStream: false });
+    styleText(format, String(text));
 
 export const dim = style("dim");
 export const green = style("green");

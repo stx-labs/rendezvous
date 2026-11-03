@@ -3,6 +3,7 @@ import type { EventEmitter } from "node:events";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import { cvToString, type ClarityValue } from "@stacks/transactions";
 import { green } from "ansicolor";
+import fc from "fast-check";
 
 import type {
   InvariantCounterExample,
@@ -184,17 +185,95 @@ export const reporter = (
     // scripts, CI systems, and other tools that check process exit status.
     process.exitCode = 1;
   } else {
-    radio.emit(
-      "logMessage",
-      green(
-        `\nOK, ${
-          type === "invariant" ? "invariants" : "properties"
-        } passed after ${numRuns} runs.\n`,
-      ),
-    );
+    // A test or invariant without a passing check was never exercised, so do
+    // not report it as passed. Discarded cases are not checks, and random
+    // selection can skip a function entirely in short runs.
+    const checks =
+      type === "invariant" ? statistics.invariant : statistics.test;
+    const unchecked = [...(checks?.successful ?? [])]
+      .filter(([, count]) => count === 0)
+      .map(([name]) => name);
+
+    // Only invariant runs call public functions.
+    const sut = statistics.sut;
+    const allCallsThrew =
+      sut !== undefined &&
+      sut.thrown > 0 &&
+      sut.thrown ===
+        computeTotalCount(sut.successful) + computeTotalCount(sut.failed);
+
+    if (allCallsThrew) {
+      radio.emit(
+        "logInfo",
+        `\nWarning: inconclusive after ${numRuns} runs: ` +
+          "every public call threw.\n",
+      );
+    }
+
+    if (unchecked.length > 0) {
+      const reason =
+        type === "invariant"
+          ? "They were never selected."
+          : "They were never selected or all of their cases were discarded.";
+      radio.emit(
+        "logInfo",
+        `\nWarning: not checked after ${numRuns} runs: ` +
+          `${unchecked.join(", ")}.\n${reason}\n`,
+      );
+    }
+
+    if (allCallsThrew || unchecked.length > 0) {
+      radio.emit("unchecked");
+    } else {
+      radio.emit(
+        "logMessage",
+        green(
+          `\nOK, ${
+            type === "invariant" ? "invariants" : "properties"
+          } passed after ${numRuns} runs.\n`,
+        ),
+      );
+    }
   }
   reportStatistics(statistics, type, radio);
   radio.emit("logMessage", "\n");
+};
+
+/**
+ * Increments the count for a function in a statistics map.
+ * @param counts The statistics map.
+ * @param name The function name.
+ */
+export const incrementCount = (counts: Map<string, number>, name: string) => {
+  counts.set(name, (counts.get(name) ?? 0) + 1);
+};
+
+/**
+ * Keeps the statistics as they were at the first failure. Without bailing,
+ * fast-check re-runs the predicate while shrinking, and those attempts would
+ * otherwise be counted as test cases.
+ * @param statistics The statistics updated by the predicate.
+ * @returns `track` to wrap the predicate and `get` to read the statistics to
+ * report.
+ */
+export const trackFailureStatistics = (statistics: Statistics) => {
+  let atFailure: Statistics | undefined = undefined;
+  return {
+    track:
+      <T, R>(predicate: (input: T) => Promise<R>) =>
+      async (input: T) => {
+        try {
+          return await predicate(input);
+        } catch (error) {
+          // A failed precondition skips the case, it is not a failure.
+          if (!fc.PreconditionFailure.isFailure(error)) {
+            atFailure ??= structuredClone(statistics);
+          }
+          throw error;
+        }
+      },
+    get: () => atFailure ?? statistics,
+  };
 };
 
 const ARROW = "->";

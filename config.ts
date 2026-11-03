@@ -36,6 +36,8 @@ export interface RendezvousConfig {
   bail?: boolean;
   /** Run regression tests only. */
   regr?: boolean;
+  /** Fail the run if a test or invariant was never checked. */
+  fail_on_unchecked?: boolean;
   /** Path to custom dialers file. */
   dial?: string;
 }
@@ -128,18 +130,14 @@ const validateConfig = (
     config.runs = obj.runs;
   }
 
-  if ("bail" in obj) {
-    if (typeof obj.bail !== "boolean") {
-      throw new Error(`"bail" must be a boolean.`);
+  for (const key of ["bail", "regr", "fail_on_unchecked"] as const) {
+    if (key in obj) {
+      const value = obj[key];
+      if (typeof value !== "boolean") {
+        throw new Error(`"${key}" must be a boolean.`);
+      }
+      config[key] = value;
     }
-    config.bail = obj.bail;
-  }
-
-  if ("regr" in obj) {
-    if (typeof obj.regr !== "boolean") {
-      throw new Error(`"regr" must be a boolean.`);
-    }
-    config.regr = obj.regr;
   }
 
   if ("dial" in obj) {
@@ -156,6 +154,7 @@ const validateConfig = (
     "runs",
     "bail",
     "regr",
+    "fail_on_unchecked",
     "dial",
   ]);
   const unknownKeys = Object.keys(obj).filter((k) => !knownKeys.has(k));

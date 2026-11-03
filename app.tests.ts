@@ -505,6 +505,75 @@ describe("Command-line arguments handling", () => {
   );
 });
 
+describe("Fail on unchecked", () => {
+  const cases = {
+    test: {
+      source: "(define-private (test-discard) (ok false))",
+      warning: "Warning: not checked after 20 runs: test-discard.",
+    },
+    invariant: {
+      source: `(define-private (update-context (name (string-ascii 100))
+                                       (calls uint)) (ok true))
+(define-public (explode) (ok (/ u1 u0)))
+(define-read-only (invariant-pass) true)`,
+      warning: "Warning: inconclusive after 20 runs: every public call threw.",
+    },
+  };
+
+  it.each([
+    ["test", false],
+    ["test", true],
+    ["invariant", false],
+    ["invariant", true],
+  ] as const)(
+    "fails a %s run without checks only on request (%j)",
+    async (type, strict) => {
+      const { source, warning } = cases[type];
+      const tempDir = createIsolatedTestEnvironment(
+        resolve(__dirname, "example"),
+        isolatedTestEnvPrefix,
+      );
+      const initialArgv = process.argv;
+      const initialExitCode = process.exitCode;
+      try {
+        writeFileSync(join(tempDir, "contracts/counter.clar"), source);
+        process.argv = [
+          "node",
+          "app.js",
+          tempDir,
+          "counter",
+          type,
+          "--seed=17",
+          "--runs=20",
+          ...(strict ? ["--fail-on-unchecked"] : []),
+        ];
+        const logs: string[] = [];
+        for (const method of ["log", "info", "error"] as const) {
+          vi.spyOn(console, method).mockImplementation((message: string) => {
+            logs.push(message);
+          });
+        }
+        process.exitCode = undefined;
+
+        await main();
+
+        const output = logs.join("\n");
+        expect(output).toContain(warning);
+        expect(output).not.toContain("passed after");
+        expect(
+          output.split("Failing the run because of --fail-on-unchecked."),
+        ).toHaveLength(strict ? 2 : 1);
+        expect(process.exitCode).toBe(strict ? 1 : undefined);
+      } finally {
+        process.exitCode = initialExitCode;
+        process.argv = initialArgv;
+        vi.restoreAllMocks();
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    },
+  );
+});
+
 describe("Contract selection", () => {
   const initialArgv = process.argv;
 
@@ -515,6 +584,7 @@ describe("Contract selection", () => {
       isolatedTestEnvPrefix,
     );
     process.argv = ["node", "app.js", tempDir, "nonexistent", "test"];
+    const initialExitCode = process.exitCode;
 
     const consoleErrors: string[] = [];
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -529,8 +599,10 @@ describe("Contract selection", () => {
     expect(consoleErrors).toContain(
       red(`\nContract "nonexistent" not found among project contracts.\n`),
     );
+    expect(process.exitCode).toBe(1);
 
     // Teardown
+    process.exitCode = initialExitCode;
     process.argv = initialArgv;
     vi.restoreAllMocks();
     rmSync(tempDir, { recursive: true, force: true });

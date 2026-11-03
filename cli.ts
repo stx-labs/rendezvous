@@ -27,6 +27,9 @@ export const helpMessage = `
     --dial=<f>    Path to custom dialers file
     --regr        Run regression tests only
     --bail        Stop on first failure
+    --fail-on-unchecked
+                  Fail if a test or invariant is never checked, or if
+                  every public call throws in invariant testing
     -h, --help    Show this message
 
   Learn more: https://stx-labs.github.io/rendezvous/
@@ -43,6 +46,7 @@ export interface RunConfig {
   runs: number | undefined;
   bail: boolean;
   regr: boolean;
+  failOnUnchecked: boolean;
   dial: string | undefined;
   accounts: ConfigAccount[] | undefined;
   accountsMode: AccountsMode;
@@ -71,6 +75,7 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
       dial: { type: "string" },
       bail: { type: "boolean" },
       regr: { type: "boolean" },
+      "fail-on-unchecked": { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -122,6 +127,7 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
       options.runs && "--runs",
       options.bail && "--bail",
       options.regr && "--regr",
+      options["fail-on-unchecked"] && "--fail-on-unchecked",
       options.dial && "--dial",
     ].filter(Boolean) as string[];
 
@@ -139,6 +145,7 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
       runs: fileConfig.runs,
       bail: fileConfig.bail ?? false,
       regr: fileConfig.regr ?? false,
+      failOnUnchecked: fileConfig.fail_on_unchecked ?? false,
       dial: fileConfig.dial,
       accounts: fileConfig.accounts,
       accountsMode: fileConfig.accounts_mode ?? "overwrite",
@@ -167,6 +174,7 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
     runs,
     bail: options.bail ?? false,
     regr: options.regr ?? false,
+    failOnUnchecked: options["fail-on-unchecked"] ?? false,
     dial: options.dial,
     accounts: undefined,
     accountsMode: "overwrite",
@@ -198,6 +206,9 @@ export const logRunConfig = (
   }
   if (config.regr) {
     radio.emit("logMessage", `Running regression tests.`);
+  }
+  if (config.failOnUnchecked) {
+    radio.emit("logMessage", `Failing if a test or invariant is not checked.`);
   }
   if (config.dial !== undefined) {
     radio.emit("logMessage", `Using dial path: ${config.dial}`);

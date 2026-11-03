@@ -171,7 +171,7 @@ importers:
         version: 3.20.0
       '@stacks/transactions':
         specifier: ^7.4.0
-        version: 7.4.0
+        version: 7.6.0
       ansicolor:
         specifier: ^2.0.3
         version: 2.0.3
@@ -214,7 +214,7 @@ importers:
         version: 1.0.3
       '@stacks/transactions':
         specifier: ^7.4.0
-        version: 7.4.0
+        version: 7.6.0
       '@types/node':
         specifier: ^24.10.0
         version: 24.19.2
@@ -556,8 +556,14 @@ packages:
   '@stacks/common@7.3.1':
     resolution: {integrity: sha512-29ANTFcSSlXnGQlgDVWg7OQ74lgQhu3x8JkeN19Q+UE/1lbQrzcctgPHG74XHjWNp8NPBqskUYA8/HLgIKuKNQ==}
 
+  '@stacks/common@7.6.0':
+    resolution: {integrity: sha512-VUW8WDmZP4wXUNWVvpFerV+7LQ0PqIn8YOs8AjSUMA7ZOXIRLxJHoKxjfiHzJqazy7KlyryPW4kSNBCr7tLqhQ==}
+
   '@stacks/network@7.3.1':
     resolution: {integrity: sha512-dQjhcwkz8lihSYSCUMf7OYeEh/Eh0++NebDtXbIB3pHWTvNCYEH7sxhYTB1iyunurv31/QEi0RuWdlfXK/BjeA==}
+
+  '@stacks/network@7.6.0':
+    resolution: {integrity: sha512-Blm85nsEbvJoFIFaDp0QE9WMC0Hf+o3Yb0oIDwWu3PPgpVSdndb/bJQUeT6eJTs0ibS26A2E/5d5L0fb4Ff/lA==}
 
   '@stacks/rendezvous@1.0.3':
     resolution: {integrity: sha512-1QJsSNRG1RF27bejQ/ifQ5ExxmLoe1UIWbotj/rPRZpWvOhCWp1p4aZ1N+gMuNawNVkXLdWoLOSmGdqkTfuYUQ==}
@@ -565,6 +571,9 @@ packages:
 
   '@stacks/transactions@7.4.0':
     resolution: {integrity: sha512-scsQO3rSNNKcPHp56Wy5OeZiIpQNmmZOORz8bkQKWjzvzycAodtSWmAoHiMFAKSleR1NyeRIz642fReqlZU9tw==}
+
+  '@stacks/transactions@7.6.0':
+    resolution: {integrity: sha512-s7F7eJtQVnZoB79j8pY9SLKhlvvdYZZD1NSDRWrFjzSJTDmxptL8c50S563WFja6KOhFOgg1jd+p0XWTxFAVyA==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -1472,6 +1481,8 @@ snapshots:
 
   '@stacks/common@7.3.1': {}
 
+  '@stacks/common@7.6.0': {}
+
   '@stacks/network@7.3.1':
     dependencies:
       '@stacks/common': 7.3.1
@@ -1479,10 +1490,17 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
+  '@stacks/network@7.6.0':
+    dependencies:
+      '@stacks/common': 7.6.0
+      cross-fetch: 3.2.0
+    transitivePeerDependencies:
+      - encoding
+
   '@stacks/rendezvous@1.0.3':
     dependencies:
       '@stacks/clarinet-sdk': 3.20.0
-      '@stacks/transactions': 7.4.0
+      '@stacks/transactions': 7.6.0
       ansicolor: 2.0.3
       fast-check: 4.5.3
     transitivePeerDependencies:
@@ -1494,6 +1512,17 @@ snapshots:
       '@noble/secp256k1': 1.7.1
       '@stacks/common': 7.3.1
       '@stacks/network': 7.3.1
+      c32check: 2.0.0
+      lodash.clonedeep: 4.5.0
+    transitivePeerDependencies:
+      - encoding
+
+  '@stacks/transactions@7.6.0':
+    dependencies:
+      '@noble/hashes': 1.1.5
+      '@noble/secp256k1': 1.7.1
+      '@stacks/common': 7.6.0
+      '@stacks/network': 7.6.0
       c32check: 2.0.0
       lodash.clonedeep: 4.5.0
     transitivePeerDependencies:

@@ -125,19 +125,9 @@ export const persistFailure = (
   const failures = store[type];
 
   // Check if this seed already exists.
-  const existing = failures.find((f) => f.seed === record.seed);
-  if (existing) {
-    // Backfill the path on records saved before it was persisted. Only when
-    // the run count and dialer match, so the path is from the same failure.
-    if (
-      !existing.counterexamplePath &&
-      record.counterexamplePath &&
-      existing.numRuns === record.numRuns &&
-      existing.dial === record.dial
-    ) {
-      existing.counterexamplePath = record.counterexamplePath;
-      saveFailureStore(contractId, baseDir, store);
-    }
+  const seedExists = failures.some((f) => f.seed === record.seed);
+  if (seedExists) {
+    // Already recorded.
     return;
   }
 

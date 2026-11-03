@@ -444,46 +444,6 @@ describe("Failure Persistence", () => {
         ),
       );
     });
-
-    it.each([
-      ["backfills a missing path", undefined, 100, undefined, "2:1:0"],
-      ["keeps a saved path", "0:1", 100, undefined, "0:1"],
-      ["skips a different run count", undefined, 20, undefined, undefined],
-      ["skips a different dialer", undefined, 100, "a.cjs", undefined],
-    ])(
-      "%s when the seed is already saved",
-      (name, savedPath, savedNumRuns, savedDial, expectedPath) => {
-        // Setup
-        const options = { baseDir: createTemporaryCustomTestBaseDir(name) };
-        persistFailure(
-          {
-            ...createMockRunDetails(17, true, savedNumRuns),
-            counterexamplePath: savedPath,
-          },
-          "invariant",
-          TEST_CONTRACT_ID,
-          savedDial,
-          options,
-        );
-
-        // Exercise
-        persistFailure(
-          { ...createMockRunDetails(17), counterexamplePath: "2:1:0" },
-          "invariant",
-          TEST_CONTRACT_ID,
-          undefined,
-          options,
-        );
-
-        // Verify
-        const failures = loadFailures(TEST_CONTRACT_ID, "invariant", options);
-        expect(failures).toHaveLength(1);
-        expect(failures[0].counterexamplePath).toBe(expectedPath);
-
-        // Teardown
-        rmSync(options.baseDir, { recursive: true, force: true });
-      },
-    );
   });
 
   describe("Loading Failures", () => {

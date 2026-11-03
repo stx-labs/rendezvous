@@ -12,7 +12,7 @@ interface FailureRecord {
   /** The number of runs needed to reproduce the failure*/
   numRuns: number;
   /** The fast-check path to the counterexample */
-  counterexamplePath?: string | null;
+  counterexamplePath?: string;
   /** The path to the dialer file used for this test run */
   dial: string | undefined;
   /** Timestamp when the failure was recorded */
@@ -117,7 +117,7 @@ export const persistFailure = (
     seed: runDetails.seed,
     dial,
     numRuns: runDetails.numRuns,
-    counterexamplePath: runDetails.counterexamplePath ?? runDetails.path,
+    counterexamplePath: runDetails.counterexamplePath,
     timestamp: Date.now(),
   };
 
@@ -125,9 +125,13 @@ export const persistFailure = (
   const failures = store[type];
 
   // Check if this seed already exists.
-  const seedExists = failures.some((f) => f.seed === record.seed);
-  if (seedExists) {
-    // Already recorded.
+  const existing = failures.find((f) => f.seed === record.seed);
+  if (existing) {
+    // Backfill the path on records saved before it was persisted.
+    if (!existing.counterexamplePath && record.counterexamplePath) {
+      existing.counterexamplePath = record.counterexamplePath;
+      saveFailureStore(contractId, baseDir, store);
+    }
     return;
   }
 

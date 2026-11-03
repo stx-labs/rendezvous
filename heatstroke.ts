@@ -29,7 +29,6 @@ import { getContractNameFromContractId } from "./shared";
  * @property `runDetails.seed`: The replay seed for reproducing the failure.
  * @property `runDetails.counterexamplePath`: Fast-check shrink metadata for
  * diagnostics; it is not an exact replay trace.
- * @property `runDetails.path`: The legacy path fallback for older callers.
  * @property `runDetails.error`: The error thrown during the test.
  * @param radio The event emitter to log messages.
  * @param type The type of test that failed: invariant or property.
@@ -41,11 +40,11 @@ export const reporter = (
   type: "invariant" | "test",
   statistics: Statistics,
 ) => {
-  const { counterexample, failed, numRuns, path, seed } = runDetails;
+  const { counterexample, counterexamplePath, failed, numRuns, seed } =
+    runDetails;
 
   if (failed) {
     const error = runDetails.errorInstance || runDetails.error;
-    const counterexamplePathValue = runDetails.counterexamplePath ?? path;
 
     // Extract the actual Clarity error once for both error types.
     const clarityError =
@@ -60,8 +59,8 @@ export const reporter = (
       `\nError: Property failed after ${numRuns} tests.`,
     );
     radio.emit("logFailure", `Seed : ${seed}`);
-    if (counterexamplePathValue) {
-      radio.emit("logFailure", `Path : ${counterexamplePathValue}`);
+    if (counterexamplePath) {
+      radio.emit("logFailure", `Path : ${counterexamplePath}`);
     }
     switch (type) {
       case "invariant": {

@@ -416,31 +416,15 @@ describe("Failure Persistence", () => {
 
       try {
         persistFailure(
-          {
-            ...createMockRunDetails(1),
-            counterexamplePath: "0:1",
-            path: "legacy",
-          },
-          "test",
-          TEST_CONTRACT_ID,
-          undefined,
-          options,
-        );
-        persistFailure(
-          { ...createMockRunDetails(2), path: "legacy" },
+          { ...createMockRunDetails(1), counterexamplePath: "0:1" },
           "test",
           TEST_CONTRACT_ID,
           undefined,
           options,
         );
 
-        const failures = loadFailures(TEST_CONTRACT_ID, "test", options);
-        expect(
-          failures.find(({ seed }) => seed === 1)?.counterexamplePath,
-        ).toBe("0:1");
-        expect(
-          failures.find(({ seed }) => seed === 2)?.counterexamplePath,
-        ).toBe("legacy");
+        const [failure] = loadFailures(TEST_CONTRACT_ID, "test", options);
+        expect(failure.counterexamplePath).toBe("0:1");
 
         const record = { seed: 17, numRuns: 20, timestamp: 123 };
         writeFileSync(
@@ -449,6 +433,40 @@ describe("Failure Persistence", () => {
         );
         expect(loadFailures(TEST_CONTRACT_ID, "invariant", options)).toEqual([
           record,
+        ]);
+      } finally {
+        rmSync(customBaseDir, { recursive: true, force: true });
+      }
+    });
+
+    it("backfills the path on a record saved without one", () => {
+      const customBaseDir = createTemporaryCustomTestBaseDir("backfill");
+      const options = { baseDir: customBaseDir };
+      const record = { seed: 17, numRuns: 20, timestamp: 123 };
+
+      try {
+        writeFileSync(
+          getFailureFilePath(TEST_CONTRACT_ID, customBaseDir),
+          JSON.stringify({ invariant: [], test: [record] }),
+        );
+
+        persistFailure(
+          { ...createMockRunDetails(17), counterexamplePath: "2:1:0" },
+          "test",
+          TEST_CONTRACT_ID,
+          undefined,
+          options,
+        );
+        persistFailure(
+          { ...createMockRunDetails(17), counterexamplePath: "9:9" },
+          "test",
+          TEST_CONTRACT_ID,
+          undefined,
+          options,
+        );
+
+        expect(loadFailures(TEST_CONTRACT_ID, "test", options)).toEqual([
+          { ...record, counterexamplePath: "2:1:0" },
         ]);
       } finally {
         rmSync(customBaseDir, { recursive: true, force: true });

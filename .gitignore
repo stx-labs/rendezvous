@@ -3,3 +3,5 @@ deployments
 dist
 coverage
 **/.cache/**
+
+.agents/reviews

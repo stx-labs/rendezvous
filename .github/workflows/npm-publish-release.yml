@@ -97,8 +97,8 @@ jobs:
           sign-commits: true
           branch: ${{ env.BRANCH_NAME }}
           base: master
-          title: "Update example project to use @stacks/rendezvous@${{ env.VERSION }}"
-          commit-message: "Update example project to use @stacks/rendezvous@${{ env.VERSION }}"
+          title: "chore: update example project to use @stacks/rendezvous@${{ env.VERSION }}"
+          commit-message: "chore: update example project to use @stacks/rendezvous@${{ env.VERSION }}"
           add-paths: |
             example/package.json
             pnpm-lock.yaml

@@ -134,7 +134,7 @@ describe("Custom reporter logging", () => {
               seed: r.seed,
               counterexample: [
                 {
-                  rendezvousContractId: rendezvousContractId,
+                  rendezvousContractId,
                   selectedFunctions:
                     r.selectedFunctions as any as ContractInterfaceFunction[],
                   selectedFunctionsArgsList: r.selectedFunctionsArgsList,
@@ -296,7 +296,7 @@ describe("Custom reporter logging", () => {
               seed: r.seed,
               counterexample: [
                 {
-                  rendezvousContractId: rendezvousContractId,
+                  rendezvousContractId,
                   selectedFunctions:
                     r.selectedFunctions as any as ContractInterfaceFunction[],
                   selectedFunctionsArgsList: r.selectedFunctionsArgsList,
@@ -460,7 +460,7 @@ describe("Custom reporter logging", () => {
               seed: r.seed,
               counterexample: [
                 {
-                  rendezvousContractId: rendezvousContractId,
+                  rendezvousContractId,
                   selectedFunctions:
                     r.selectedFunctions as any as ContractInterfaceFunction[],
                   selectedFunctionsArgsList: r.selectedFunctionsArgsList,
@@ -551,7 +551,7 @@ describe("Custom reporter logging", () => {
               seed: r.seed,
               counterexample: [
                 {
-                  rendezvousContractId: rendezvousContractId,
+                  rendezvousContractId,
                   selectedTestFunction:
                     r.selectedTestFunction as any as ContractInterfaceFunction,
                   functionArgs: r.functionArgs,
@@ -665,7 +665,7 @@ describe("Custom reporter logging", () => {
               seed: r.seed,
               counterexample: [
                 {
-                  rendezvousContractId: rendezvousContractId,
+                  rendezvousContractId,
                   selectedTestFunction:
                     r.selectedTestFunction as any as ContractInterfaceFunction,
                   functionArgs: r.functionArgs,
@@ -777,7 +777,7 @@ describe("Custom reporter logging", () => {
               seed: r.seed,
               counterexample: [
                 {
-                  rendezvousContractId: rendezvousContractId,
+                  rendezvousContractId,
                   selectedTestFunction:
                     r.selectedTestFunction as any as ContractInterfaceFunction,
                   functionArgs: r.functionArgs,

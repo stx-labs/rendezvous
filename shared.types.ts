@@ -74,11 +74,7 @@ export interface ComplexTypesToCV {
 
 /** The base Clarity parameter types, as found in the contract interface. */
 export type BaseType =
-  | "int128"
-  | "uint128"
-  | "bool"
-  | "principal"
-  | "trait_reference";
+  "int128" | "uint128" | "bool" | "principal" | "trait_reference";
 
 /**
  * The base Clarity parameter types, after the contract interface is "enriched"

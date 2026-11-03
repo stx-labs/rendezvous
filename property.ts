@@ -523,7 +523,7 @@ const propertyTest = async (
       endOnFailure: bail,
       numRuns: runs,
       reporter: radioReporter,
-      seed: seed,
+      seed,
       verbose: true,
     },
   );

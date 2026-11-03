@@ -421,9 +421,8 @@ const invariantTest = async (
                 },
               ),
               selectedFunctionsArgsList: fc.tuple(
-                ...r.selectedFunctions.map(
-                  (selectedFunction) =>
-                    sutStrategies.get(selectedFunction.name)!,
+                ...r.selectedFunctions.map((selectedFunction) =>
+                  sutStrategies.get(selectedFunction.name)!,
                 ),
               ),
               invariantArgs: invariantStrategies.get(r.selectedInvariant.name)!,
@@ -463,7 +462,7 @@ const invariantTest = async (
           try {
             if (dialerRegistry !== undefined) {
               await dialerRegistry.executePreDialers({
-                selectedFunction: selectedFunction,
+                selectedFunction,
                 functionCall: undefined,
                 clarityValueArguments: r.selectedFunctionsArgsList[index],
               });
@@ -535,8 +534,8 @@ const invariantTest = async (
               try {
                 if (dialerRegistry !== undefined) {
                   await dialerRegistry.executePostDialers({
-                    selectedFunction: selectedFunction,
-                    functionCall: functionCall,
+                    selectedFunction,
+                    functionCall,
                     clarityValueArguments: r.selectedFunctionsArgsList[index],
                   });
                 }
@@ -687,7 +686,7 @@ const invariantTest = async (
       endOnFailure: bail,
       numRuns: runs,
       reporter: radioReporter,
-      seed: seed,
+      seed,
       verbose: true,
     },
   );

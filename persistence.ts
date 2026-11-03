@@ -113,7 +113,7 @@ export const persistFailure = (
 
   const record: FailureRecord = {
     seed: runDetails.seed,
-    dial: dial,
+    dial,
     numRuns: runDetails.numRuns,
     timestamp: Date.now(),
   };

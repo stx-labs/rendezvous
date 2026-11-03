@@ -82,7 +82,7 @@ describe("DialerRegistry interaction", () => {
     const registry = new DialerRegistry("non-existent.js");
 
     // Act & Assert
-    expect(registry.registerDialers()).rejects.toThrow(
+    await expect(registry.registerDialers()).rejects.toThrow(
       "process.exit was called",
     );
   });

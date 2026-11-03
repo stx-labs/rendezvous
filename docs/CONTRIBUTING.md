@@ -8,7 +8,8 @@ To keep things simple and to maintain quality, please follow these guidelines.
 
 - Please read our `README.md` and `ACKNOWLEDGEMENTS` to understand our work.
 - Familiarize yourself with our directory structure. Each file is hand-crafted.
-- Make sure that you are using Node.js LTS or later.
+- Make sure that you are using a Node.js version supported by `@stacks/clarinet-sdk`.
+- Install [pnpm](https://pnpm.io/installation), then run `pnpm install`.
 
 ## How to Contribute
 
@@ -42,7 +43,7 @@ To keep things simple and to maintain quality, please follow these guidelines.
    Run tests:
 
    ```
-   npm test
+   pnpm test
    ```
 
    Make sure all tests pass before sending your changes.

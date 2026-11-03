@@ -193,6 +193,26 @@ describe("Config loading and validation", () => {
     // Act & Assert
     expect(() => loadConfig(filePath)).toThrow(`"bail" must be a boolean.`);
   });
+
+  it("loads fail_on_unchecked and rejects non-boolean values", () => {
+    const valid = loadConfig(
+      createTempConfigFile(
+        "fail-on-unchecked",
+        JSON.stringify({ fail_on_unchecked: true }),
+      ),
+    );
+    expect(valid.config.fail_on_unchecked).toBe(true);
+    expect(valid.unknownKeys).toEqual([]);
+
+    expect(() =>
+      loadConfig(
+        createTempConfigFile(
+          "fail-on-unchecked-string",
+          JSON.stringify({ fail_on_unchecked: "yes" }),
+        ),
+      ),
+    ).toThrow(`"fail_on_unchecked" must be a boolean.`);
+  });
 });
 
 describe("Account resolution", () => {

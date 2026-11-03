@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "build": "npx -p typescript tsc --project tsconfig.build.json && node -e \"if (process.platform !== 'win32') require('fs').chmodSync('./dist/app.js', 0o755);\"",
+    "build": "tsc --project tsconfig.build.json && node -e \"if (process.platform !== 'win32') require('fs').chmodSync('./dist/app.js', 0o755);\"",
     "fmt": "prettier --write .",
     "fmt:check": "prettier --check .",
     "lint": "oxlint -c oxlintrc.json",
@@ -32,6 +32,7 @@
   ],
   "author": "Radu Bahmata, Nikos Baxevanis",
   "license": "GPL-3.0-only",
+  "packageManager": "pnpm@12.15.0+sha512.b3951d6d6ff4a9f13dc7cf56cd28d2b8eb37dbcc9c68e52e1e1191873ea9f82a017287ab50baadc5ccc494f036c67c0e47eb13608c2fa36f47711b61ea128e61",
   "files": [
     "dist/",
     "package.json",
@@ -46,19 +47,19 @@
     "access": "public"
   },
   "dependencies": {
-    "@stacks/clarinet-sdk": "^3.20.0",
-    "@stacks/transactions": "^7.4.0",
+    "@stacks/clarinet-sdk": "^3.26.0",
+    "@stacks/transactions": "^7.6.0",
     "ansicolor": "^2.0.3",
-    "fast-check": "^4.5.3"
+    "fast-check": "^4.10.2"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
-    "@stacks/clarinet-sdk-wasm": "^3.20.0",
-    "@types/node": "^25.6.0",
-    "@vitest/coverage-v8": "^4.0.8",
-    "oxlint": "^1.58.0",
-    "prettier": "^3.8.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.8"
+    "@stacks/clarinet-sdk-wasm": "^3.26.0",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.0.5",
+    "oxlint": "^1.90.0",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }

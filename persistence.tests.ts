@@ -17,8 +17,7 @@ const TEST_CONTRACT_ID = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter";
 
 const fileNameRegex = /^[a-zA-Z0-9_-]+$/;
 
-// Starts from an empty directory, so files left by a failed case, whose
-// teardown did not run, cannot leak into a shrinking rerun.
+// Start empty: a failed case skips its teardown, and shrinking reruns it.
 const createTemporaryCustomTestBaseDir = (dirName: string) => {
   const path = join(temporaryTestBaseDir, dirName);
   rmSync(path, { recursive: true, force: true });
@@ -419,7 +418,7 @@ describe("Failure Persistence", () => {
           fc.record({
             customBaseDirName: fc.stringMatching(fileNameRegex),
             seed: fc.integer(),
-            counterexamplePath: fc.string(),
+            counterexamplePath: fc.option(fc.string()),
           }),
           ({ customBaseDirName, seed, counterexamplePath }) => {
             // Setup
@@ -439,7 +438,9 @@ describe("Failure Persistence", () => {
             const failures = loadFailures(TEST_CONTRACT_ID, "test", {
               baseDir: customBaseDir,
             });
-            expect(failures[0].counterexamplePath).toBe(counterexamplePath);
+            expect(failures[0].counterexamplePath).toBe(
+              counterexamplePath ?? undefined,
+            );
 
             // Teardown
             rmSync(customBaseDir, { recursive: true, force: true });

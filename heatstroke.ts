@@ -28,7 +28,7 @@ import { getContractNameFromContractId } from "./shared";
  * @property `runDetails.numRuns`: The number of test cases that were run.
  * @property `runDetails.seed`: The replay seed for reproducing the failure.
  * @property `runDetails.counterexamplePath`: The fast-check path to the
- * counterexample, kept for diagnostics.
+ * counterexample.
  * @property `runDetails.error`: The error thrown during the test.
  * @param radio The event emitter to log messages.
  * @param type The type of test that failed: invariant or property.

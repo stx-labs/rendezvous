@@ -1914,8 +1914,26 @@ describe("Trait reference processing", () => {
                     },
                     {
                       name: "token",
-                      // Private functions are not picked for generation.
-                      type: "trait_reference",
+                      type: {
+                        trait_reference: {
+                          name: "ft-trait",
+                          import: {
+                            Imported: {
+                              name: "sip-010-trait",
+                              contract_identifier: {
+                                name: "sip-010-trait-ft-standard",
+                                issuer: [
+                                  22,
+                                  [
+                                    9, 159, 184, 137, 38, 216, 47, 48, 178, 244,
+                                    14, 175, 62, 228, 35, 203, 114, 91, 219, 59,
+                                  ],
+                                ],
+                              },
+                            },
+                          },
+                        },
+                      },
                     },
                   ],
                 },
@@ -2106,8 +2124,26 @@ describe("Trait reference processing", () => {
                     },
                     {
                       name: "token",
-                      // Private functions are not picked for generation.
-                      type: "trait_reference",
+                      type: {
+                        trait_reference: {
+                          name: "ft-trait",
+                          import: {
+                            Imported: {
+                              name: "sip-010-trait",
+                              contract_identifier: {
+                                name: "sip-010-trait-ft-standard",
+                                issuer: [
+                                  22,
+                                  [
+                                    9, 159, 184, 137, 38, 216, 47, 48, 178, 244,
+                                    14, 175, 62, 228, 35, 203, 114, 91, 219, 59,
+                                  ],
+                                ],
+                              },
+                            },
+                          },
+                        },
+                      },
                     },
                   ],
                 },

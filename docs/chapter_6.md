@@ -45,7 +45,8 @@ This chapter explains how to use Rendezvous in different situations. By the end,
 To run Rendezvous, use the following command:
 
 ```bash
-rv <path-to-clarinet-project> <contract-name> <type> [--config] [--seed] [--runs] [--regr] [--bail] [--dial]
+rv <path-to-clarinet-project> <contract-name> <type> \
+  [--config] [--seed] [--runs] [--regr] [--bail] [--fail-on-unchecked] [--dial]
 ```
 
 Let's break down each part of the command.
@@ -383,15 +384,16 @@ A config file is a JSON object with optional fields:
 }
 ```
 
-| Field           | Type             | Description                                             |
-| --------------- | ---------------- | ------------------------------------------------------- |
-| `accounts`      | array of objects | Custom accounts (`name` and `address` fields required). |
-| `accounts_mode` | string           | `"overwrite"` (default) or `"concatenate"`.             |
-| `seed`          | integer          | Seed for replay functionality.                          |
-| `runs`          | positive integer | Number of test iterations.                              |
-| `bail`          | boolean          | Stop on first failure.                                  |
-| `regr`          | boolean          | Run regression tests only.                              |
-| `dial`          | string           | Path to custom dialers file.                            |
+| Field               | Type             | Description                                             |
+| ------------------- | ---------------- | ------------------------------------------------------- |
+| `accounts`          | array of objects | Custom accounts (`name` and `address` fields required). |
+| `accounts_mode`     | string           | `"overwrite"` (default) or `"concatenate"`.             |
+| `seed`              | integer          | Seed for replay functionality.                          |
+| `runs`              | positive integer | Number of test iterations.                              |
+| `bail`              | boolean          | Stop on first failure.                                  |
+| `regr`              | boolean          | Run regression tests only.                              |
+| `dial`              | string           | Path to custom dialers file.                            |
+| `fail_on_unchecked` | boolean          | Fail the run when a test or invariant goes unchecked.   |
 
 The `accounts` field lets you define custom accounts for testing. By default (`"overwrite"` mode), these replace the Devnet.toml accounts entirely. With `"concatenate"` mode, config accounts are merged with the existing Devnet accounts — if a name appears in both, the config account's address takes precedence.
 
@@ -399,17 +401,18 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 
 ### Summary
 
-| Argument/Option              | Description                                                                      | Example                                           |
-| ---------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `<path-to-clarinet-project>` | Path to the Clarinet project (where `Clarinet.toml` is located).                 | `rv root contract test`                           |
-| `<contract-name>`            | Name of the contract to test (as in `Clarinet.toml`).                            | `rv root contract test`                           |
-| `<type>`                     | Type of test (`test` for property-based tests, `invariant` for invariant tests). | `rv root contract test`                           |
-| `--runs=<num>`               | Sets the number of test iterations (default: 100).                               | `rv root contract test --runs=500`                |
-| `--seed=<num>`               | Uses a specific seed for reproducibility.                                        | `rv root contract test --seed=12345`              |
-| `--regr`                     | Run regression tests only (replay saved failures).                               | `rv root contract test --regr`                    |
-| `--bail`                     | Stop after the first failure.                                                    | `rv root contract test --bail`                    |
-| `--dial=<file>`              | Loads JavaScript dialers from a file for pre/post-processing.                    | `rv root contract test --dial=./custom-dialer.js` |
-| `--config=<file>`            | Uses a JSON config file for all run options.                                     | `rv root contract test --config=rv.config.json`   |
+| Argument/Option              | Description                                                                             | Example                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `<path-to-clarinet-project>` | Path to the Clarinet project (where `Clarinet.toml` is located).                        | `rv root contract test`                           |
+| `<contract-name>`            | Name of the contract to test (as in `Clarinet.toml`).                                   | `rv root contract test`                           |
+| `<type>`                     | Type of test (`test` for property-based tests, `invariant` for invariant tests).        | `rv root contract test`                           |
+| `--runs=<num>`               | Sets the number of test iterations (default: 100).                                      | `rv root contract test --runs=500`                |
+| `--seed=<num>`               | Uses a specific seed for reproducibility.                                               | `rv root contract test --seed=12345`              |
+| `--regr`                     | Run regression tests only (replay saved failures).                                      | `rv root contract test --regr`                    |
+| `--bail`                     | Stop after the first failure.                                                           | `rv root contract test --bail`                    |
+| `--dial=<file>`              | Loads JavaScript dialers from a file for pre/post-processing.                           | `rv root contract test --dial=./custom-dialer.js` |
+| `--config=<file>`            | Uses a JSON config file for all run options.                                            | `rv root contract test --config=rv.config.json`   |
+| `--fail-on-unchecked`        | Exits with code 1 when a test or invariant goes unchecked, or every public call throws. | `rv root contract test --fail-on-unchecked`       |
 
 ---
 
@@ -460,6 +463,11 @@ The contract source, test functions, and **context** all live in the same file. 
 Rendezvous uses a **context** to track function calls and execution details during invariant testing. This allows for better tracking of execution details and invariant validation.
 
 > **Important:** Every contract tested with Rendezvous **invariant testing** must include the `context` map and the `update-context` private function. During invariant testing, Rendezvous calls public functions and uses `update-context` to track successful executions. This tracking enables invariants to reason about how many times each function has been called. If these are missing during invariant testing, Rendezvous will throw a runtime error. The context is not required for property-based testing.
+>
+> `update-context` must return `(ok true)`, as `(ok (map-set ...))` does. If it
+> throws or returns anything else, invariants would read a stale context, so
+> Rendezvous stops the run with exit code 1. This is not saved as a
+> regression.
 
 ### How the Context Works
 
@@ -582,6 +590,17 @@ In this case, if `n <= 1`, the test **discards itself** by returning `(ok false)
 | **In-Place Discarding** | When discarding logic is simple and part of the test itself.      |
 
 In general, **in-place discarding is preferred** because it keeps test logic together and is easier to maintain. Use a **discard function** only when it's important to prevent execution entirely.
+
+Discarded cases do not count as checks. Rendezvous warns instead of printing
+a passing summary if any test has no passing case (all its cases were
+discarded or it was never selected), or an invariant was never selected.
+Invariant campaigns where every public call throws warn as inconclusive.
+Tests or invariants skipped for missing trait implementations, contracts
+without any, and `--regr` runs without saved regressions also count as
+unchecked.
+Default exit codes are unchanged; `--fail-on-unchecked` (config key
+`fail_on_unchecked`) makes any of these fail the run with exit code 1.
+An invalid discard function always fails the run, since no test can run.
 
 ## Custom Manifest Files
 

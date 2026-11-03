@@ -1,0 +1,11 @@
+[project]
+name = 'bench'
+telemetry = false
+cache_dir = './.cache'
+
+[contracts.bench]
+path = 'contracts/bench.clar'
+clarity_version = 5
+# Pinned so results stay comparable across clarinet-sdk upgrades ("latest"
+# resolves to 3.4 in 3.20.0 but moves with the SDK).
+epoch = 3.4

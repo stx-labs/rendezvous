@@ -13,7 +13,9 @@
     "no-nested-ternary": "off",
     "no-await-in-loop": "off",
     "no-continue": "off",
-    "prefer-template": "off"
+    "prefer-template": "off",
+    "one-var": "off",
+    "prefer-named-capture-group": "off"
   },
   "categories": {
     "correctness": "error",

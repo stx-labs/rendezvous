@@ -10,6 +10,10 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    # PR titles become squash commit subjects; keep them conventional.
+    commit-message:
+      prefix: chore
+      include: scope
 
   - package-ecosystem: github-actions
     directory: /
@@ -17,3 +21,6 @@ updates:
       interval: weekly
     cooldown:
       default-days: 5
+    commit-message:
+      prefix: ci
+      include: scope

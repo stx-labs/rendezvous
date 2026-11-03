@@ -86,6 +86,14 @@ describe("strategyFor", () => {
     );
   });
 
+  it("produces trait reference arguments for a private test function", async () => {
+    const simnet = await initSimnet(manifestPath);
+    const fn = getContractFunction(simnet, "send-tokens", "test-transfer");
+    const [[token]] = fc.sample(strategyFor(simnet, fn), 1);
+
+    expect(token).toHaveProperty("type", "contract");
+  });
+
   it("produces arguments usable with simnet.callPublicFn", async () => {
     const simnet = await initSimnet(manifestPath);
     const fn = getContractFunction(simnet, "counter", "add");

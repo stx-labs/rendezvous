@@ -321,7 +321,7 @@ const getTraitReferenceData = (
     // definition.
     if (
       !potentialFunctionDefinitionAtom ||
-      !["define-public", "define-read-only"].includes(
+      !["define-public", "define-read-only", "define-private"].includes(
         (potentialFunctionDefinitionAtom.expr as Atom).Atom.toString(),
       )
     ) {

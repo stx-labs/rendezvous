@@ -30,6 +30,7 @@ export interface InvariantCounterExample {
 }
 
 interface SutFunctionStatistics {
+  thrown: number;
   successful: Map<string, number>;
   failed: Map<string, number>;
 }

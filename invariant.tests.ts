@@ -119,9 +119,6 @@ describe("Custom dialers", () => {
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
 
-    // A fresh dialer path forces a cold dynamic import, so the runs would
-    // start before registration completes if it were not awaited. The dialer
-    // runs in the same process and reports its calls through a global.
     const preDialer = vi.fn();
     vi.stubGlobal("__rvPreDialer", preDialer);
     const dialPath = join(tempDir, "record-calls-dialer.mjs");
@@ -158,7 +155,8 @@ describe("Custom dialers", () => {
 
     // Verify
 
-    // Every SUT call, including the first one, is preceded by the pre-dialer.
+    // No SUT call ran without its pre-dialer. The first check keeps the count
+    // comparison from passing trivially at zero.
     expect(callPublicFn).toHaveBeenCalled();
     expect(preDialer).toHaveBeenCalledTimes(callPublicFn.mock.calls.length);
 

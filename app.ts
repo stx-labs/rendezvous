@@ -80,6 +80,15 @@ export const main = async () => {
 
   logWarnings(radio, runConfig.warnings);
 
+  // Unchecked tests and inconclusive campaigns fail only on request. The
+  // event can fire once per regression, so fail once after the run.
+  let unchecked = false;
+  if (runConfig.failOnUnchecked) {
+    radio.on("unchecked", () => {
+      unchecked = true;
+    });
+  }
+
   const manifestPath = join(
     runConfig.manifestDir,
     getManifestFileName(runConfig.manifestDir, runConfig.sutContractName),
@@ -117,6 +126,7 @@ export const main = async () => {
       "logFailure",
       `\nContract "${runConfig.sutContractName}" not found among project contracts.\n`,
     );
+    process.exitCode = 1;
     return;
   }
 
@@ -164,6 +174,14 @@ export const main = async () => {
       );
       break;
     }
+  }
+
+  if (unchecked) {
+    radio.emit(
+      "logFailure",
+      "Failing the run because of --fail-on-unchecked.\n",
+    );
+    process.exitCode = 1;
   }
 };
 

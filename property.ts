@@ -11,7 +11,7 @@ import {
 import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
-import { reporter } from "./heatstroke";
+import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
 import { strategyFor } from "./lib";
 import {
@@ -181,6 +181,8 @@ export const checkProperties = async (
   );
 
   if (hasDiscardFunctionErrors) {
+    // The validation errors are already logged. No test can run, so fail.
+    process.exitCode = 1;
     return;
   }
 
@@ -196,6 +198,7 @@ export const checkProperties = async (
         `No test functions found for the "${targetContractName}" contract.\n`,
       ),
     );
+    radio.emit("unchecked");
     return;
   }
 
@@ -220,6 +223,11 @@ export const checkProperties = async (
         `${regressions.length} regressions`,
       )} for the ${targetContractName} contract.\n`,
     );
+
+    if (regressions.length === 0) {
+      // Nothing is replayed, so nothing is checked.
+      radio.emit("unchecked");
+    }
 
     for (const regression of regressions) {
       emitPropertyRegressionTestHeader(
@@ -325,8 +333,10 @@ const propertyTest = async (
     statistics.test!.failed.set(functionInterface.name, 0);
   }
 
+  const failureStatistics = trackFailureStatistics(statistics);
+
   const radioReporter = async (runDetails: any) => {
-    reporter(runDetails, radio, "test", statistics);
+    reporter(runDetails, radio, "test", failureStatistics.get());
 
     // Persist failures for regression testing.
     if (runDetails.failed) {
@@ -383,7 +393,7 @@ const propertyTest = async (
             })
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
-      async (r) => {
+      failureStatistics.track(async (r) => {
         const printedTestFunctionArgs = r.functionArgs
           .map((cv) => cvToString(cv))
           .join(" ");
@@ -394,31 +404,31 @@ const propertyTest = async (
           .get(r.rendezvousContractId)!
           .get(r.selectedTestFunction.name);
 
-        const discarded = isTestDiscarded(
-          discardFunctionName,
-          r.functionArgs,
-          r.rendezvousContractId,
-          simnet,
-          testCallerAddress,
-        );
+        try {
+          const discarded = isTestDiscarded(
+            discardFunctionName,
+            r.functionArgs,
+            r.rendezvousContractId,
+            simnet,
+            testCallerAddress,
+          );
 
-        if (discarded) {
-          statistics.test!.discarded.set(
-            r.selectedTestFunction.name,
-            statistics.test!.discarded.get(r.selectedTestFunction.name)! + 1,
-          );
-          radio.emit(
-            "logMessage",
-            `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
-              `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
-              `${dim(testCallerWallet)} ` +
-              `${yellow("[WARN]")} ` +
-              `${targetContractName} ` +
-              `${underline(r.selectedTestFunction.name)} ` +
-              dim(printedTestFunctionArgs),
-          );
-        } else {
-          try {
+          if (discarded) {
+            incrementCount(
+              statistics.test!.discarded,
+              r.selectedTestFunction.name,
+            );
+            radio.emit(
+              "logMessage",
+              `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
+                `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
+                `${dim(testCallerWallet)} ` +
+                `${yellow("[WARN]")} ` +
+                `${targetContractName} ` +
+                `${underline(r.selectedTestFunction.name)} ` +
+                dim(printedTestFunctionArgs),
+            );
+          } else {
             // If the function call results in a runtime error, the error will
             // be caught and logged as a test failure in the catch block.
             const { result: testFunctionCallResult } = simnet.callPrivateFn(
@@ -437,10 +447,9 @@ const propertyTest = async (
             );
 
             if (discardedInPlace) {
-              statistics.test!.discarded.set(
+              incrementCount(
+                statistics.test!.discarded,
                 r.selectedTestFunction.name,
-                statistics.test!.discarded.get(r.selectedTestFunction.name)! +
-                  1,
               );
               radio.emit(
                 "logMessage",
@@ -458,10 +467,9 @@ const propertyTest = async (
               testFunctionCallResult.type === ClarityType.ResponseOk &&
               testFunctionCallResult.value.type === ClarityType.BoolTrue
             ) {
-              statistics.test!.successful.set(
+              incrementCount(
+                statistics.test!.successful,
                 r.selectedTestFunction.name,
-                statistics.test!.successful.get(r.selectedTestFunction.name)! +
-                  1,
               );
               radio.emit(
                 "logMessage",
@@ -479,10 +487,6 @@ const propertyTest = async (
                 simnet.mineEmptyBurnBlocks(r.burnBlocks);
               }
             } else {
-              statistics.test!.failed.set(
-                r.selectedTestFunction.name,
-                statistics.test!.failed.get(r.selectedTestFunction.name)! + 1,
-              );
               // The function call did not result in (ok true) or (ok false).
               // Either the test failed or the test function returned an
               // unexpected value i.e. `(ok 1)`.
@@ -491,36 +495,39 @@ const propertyTest = async (
                 testFunctionCallClarityResult,
               );
             }
-          } catch (error: any) {
-            const displayedError =
-              error instanceof PropertyTestError
-                ? error.clarityError
-                : error &&
-                    typeof error === "string" &&
-                    error.toLowerCase().includes("runtime")
-                  ? "(runtime)"
-                  : "(unknown)";
-
-            // Capture the error and log the test failure.
-            radio.emit(
-              "logMessage",
-              red(
-                `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
-                  `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
-                  `${testCallerWallet} ` +
-                  `[FAIL] ` +
-                  `${targetContractName} ` +
-                  `${underline(r.selectedTestFunction.name)} ` +
-                  `${printedTestFunctionArgs} ` +
-                  displayedError,
-              ),
-            );
-
-            // Re-throw the error for fast-check to catch and process.
-            throw error;
           }
+        } catch (error: any) {
+          // Count failures returned by the test and runtime errors from the
+          // test or its discard function.
+          incrementCount(statistics.test!.failed, r.selectedTestFunction.name);
+          const displayedError =
+            error instanceof PropertyTestError
+              ? error.clarityError
+              : error &&
+                  typeof error === "string" &&
+                  error.toLowerCase().includes("runtime")
+                ? "(runtime)"
+                : "(unknown)";
+
+          // Capture the error and log the test failure.
+          radio.emit(
+            "logMessage",
+            red(
+              `₿ ${simnet.burnBlockHeight.toString().padStart(8)} ` +
+                `Ӿ ${simnet.blockHeight.toString().padStart(8)}   ` +
+                `${testCallerWallet} ` +
+                `[FAIL] ` +
+                `${targetContractName} ` +
+                `${underline(r.selectedTestFunction.name)} ` +
+                `${printedTestFunctionArgs} ` +
+                displayedError,
+            ),
+          );
+
+          // Re-throw the error for fast-check to catch and process.
+          throw error;
         }
-      },
+      }),
     ),
     {
       endOnFailure: bail,
@@ -557,6 +564,8 @@ const emitMissingTraitWarning = (
       `Note: You can add contracts implementing traits either as project contracts or as requirements.\n`,
     ),
   );
+  // Skipped tests are never checked.
+  radio.emit("unchecked");
 };
 
 /**

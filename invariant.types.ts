@@ -3,6 +3,7 @@ import type { EventEmitter } from "node:events";
 import type { Simnet } from "@stacks/clarinet-sdk";
 
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
+import type { ImplementedTraitType } from "./traits.types";
 
 type ContractId = string;
 
@@ -41,4 +42,6 @@ export interface InvariantTestContext {
   functions: EnrichedContractInterfaceFunction[];
   /** Invariant functions for the target contract. */
   invariants: EnrichedContractInterfaceFunction[];
+  /** Project contracts mapped to the traits they implement. */
+  projectTraitImplementations: Record<string, ImplementedTraitType[]>;
 }

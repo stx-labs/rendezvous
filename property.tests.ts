@@ -8,7 +8,6 @@ import type {
   ContractInterfaceFunctionArg,
   ContractInterfaceFunctionOutput,
 } from "@stacks/clarinet-sdk-wasm";
-import { cvToJSON } from "@stacks/transactions";
 import fc from "fast-check";
 
 import {
@@ -239,10 +238,8 @@ describe("Test discarding related operations", () => {
       simnet.deployer,
     );
 
-    const functionCallResultJson = cvToJSON(functionCallResult);
-
     // Exercise
-    const dircardedInPlace = isTestDiscardedInPlace(functionCallResultJson);
+    const dircardedInPlace = isTestDiscardedInPlace(functionCallResult);
 
     // Verify
     expect(dircardedInPlace).toBe(true);
@@ -274,10 +271,8 @@ describe("Test discarding related operations", () => {
       simnet.deployer,
     );
 
-    const functionCallResultJson = cvToJSON(functionCallResult);
-
     // Exercise
-    const dircardedInPlace = isTestDiscardedInPlace(functionCallResultJson);
+    const dircardedInPlace = isTestDiscardedInPlace(functionCallResult);
 
     // Verify
     expect(dircardedInPlace).toBe(false);

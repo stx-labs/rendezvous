@@ -3,6 +3,7 @@ import type { EventEmitter } from "node:events";
 import type { Simnet } from "@stacks/clarinet-sdk";
 
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
+import type { ImplementedTraitType } from "./traits.types";
 
 /**
  * The configuration for a property test.
@@ -27,4 +28,6 @@ export interface PropertyTestContext {
   testFunctions: EnrichedContractInterfaceFunction[];
   /** Test functions paired with their corresponding discard functions. */
   testContractsPairedFunctions: Map<string, Map<string, string | undefined>>;
+  /** Project contracts mapped to the traits they implement. */
+  projectTraitImplementations: Record<string, ImplementedTraitType[]>;
 }

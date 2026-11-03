@@ -5,7 +5,7 @@ import type { Simnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import {
   Cl,
-  cvToJSON,
+  ClarityType,
   cvToString,
   type ClarityValue,
 } from "@stacks/transactions";
@@ -261,6 +261,7 @@ export const checkInvariants = async (
         allAddresses,
         functions,
         invariants,
+        projectTraitImplementations,
       });
     }
   } else {
@@ -283,6 +284,7 @@ export const checkInvariants = async (
       allAddresses,
       functions,
       invariants,
+      projectTraitImplementations,
     });
   }
 };
@@ -309,18 +311,26 @@ const invariantTest = async (
     allAddresses,
     functions,
     invariants,
+    projectTraitImplementations,
   } = config;
 
   // Pre-build one fast-check arbitrary per SUT and invariant function via
   // the public library API, so invariant runs exercise the same strategy
   // pipeline as library consumers. `allAddresses` is threaded through so
   // any upstream account filtering (e.g. user-restricted accounts) is
-  // honored.
+  // honored. The trait implementations are passed in so they are not
+  // re-extracted from the simnet for every function.
   const sutStrategies = new Map<string, fc.Arbitrary<ClarityValue[]>>(
-    functions.map((fn) => [fn.name, strategyFor(simnet, fn, allAddresses)]),
+    functions.map((fn) => [
+      fn.name,
+      strategyFor(simnet, fn, allAddresses, projectTraitImplementations),
+    ]),
   );
   const invariantStrategies = new Map<string, fc.Arbitrary<ClarityValue[]>>(
-    invariants.map((fn) => [fn.name, strategyFor(simnet, fn, allAddresses)]),
+    invariants.map((fn) => [
+      fn.name,
+      strategyFor(simnet, fn, allAddresses, projectTraitImplementations),
+    ]),
   );
 
   /**
@@ -479,8 +489,6 @@ const invariantTest = async (
               sutCallerAddress,
             );
 
-            const functionCallResultJson = cvToJSON(functionCall.result);
-
             // Reaching this point means the function call went through, but it
             // may still have returned an error result. Get the result, convert
             // it to Clarity string format, and report it to improve the user
@@ -490,7 +498,7 @@ const invariantTest = async (
               functionCall.result,
             );
 
-            if (functionCallResultJson.success) {
+            if (functionCall.result.type === ClarityType.ResponseOk) {
               incrementCount(statistics.sut!.successful, selectedFunction.name);
               const calls = ++localContext[r.rendezvousContractId][
                 selectedFunction.name
@@ -608,11 +616,9 @@ const invariantTest = async (
             invariantCallerAddress,
           );
 
-          const invariantCallResultJson = cvToJSON(invariantCallResult);
-
           const invariantCallClarityResult = cvToString(invariantCallResult);
 
-          if (invariantCallResultJson.value === true) {
+          if (invariantCallResult.type === ClarityType.BoolTrue) {
             incrementCount(
               statistics.invariant!.successful,
               r.selectedInvariant.name,
@@ -687,7 +693,7 @@ const invariantTest = async (
       numRuns: runs,
       reporter: radioReporter,
       seed,
-      verbose: true,
+      verbose: false,
     },
   );
 };
@@ -751,14 +757,13 @@ export const initializeLocalContext = (
 
 /**
  * Checks that an `update-context` call returned `(ok true)`, as `map-set`
- * does. `cvToJSON` wraps the boolean, so `(ok false)` has a truthy `value`.
+ * does.
  * @param result The Clarity value returned by `update-context`.
  * @returns Whether the result is `(ok true)`.
  */
-const isOkTrue = (result: ClarityValue) => {
-  const json = cvToJSON(result);
-  return json.success === true && json.value?.value === true;
-};
+const isOkTrue = (result: ClarityValue) =>
+  result.type === ClarityType.ResponseOk &&
+  result.value.type === ClarityType.BoolTrue;
 
 /**
  * Initializes the Clarity context by calling update-context for each SUT

@@ -3,6 +3,7 @@ import type { EventEmitter } from "node:events";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import { cvToString, type ClarityValue } from "@stacks/transactions";
 import { green } from "ansicolor";
+import fc from "fast-check";
 
 import type {
   InvariantCounterExample,
@@ -264,7 +265,10 @@ export const trackFailureStatistics = (statistics: Statistics) => {
         try {
           return await predicate(input);
         } catch (error) {
-          atFailure ??= structuredClone(statistics);
+          // A failed precondition skips the case, it is not a failure.
+          if (!fc.PreconditionFailure.isFailure(error)) {
+            atFailure ??= structuredClone(statistics);
+          }
           throw error;
         }
       },

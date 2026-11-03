@@ -231,6 +231,11 @@ export const checkInvariants = async (
       )} for the ${targetContractName} contract.\n`,
     );
 
+    if (regressions.length === 0) {
+      // Nothing is replayed, so nothing is checked.
+      radio.emit("unchecked");
+    }
+
     for (const regression of regressions) {
       emitInvariantRegressionTestHeader(
         radio,
@@ -355,7 +360,21 @@ const invariantTest = async (
 
   const failureStatistics = trackFailureStatistics(statistics);
 
+  // A failed context update is a harness error, not a counterexample. Once it
+  // happens, later cases are skipped so fast-check does not shrink it, and it
+  // is reported on its own instead of being persisted as a regression.
+  let contextUpdateError: ContextUpdateError | undefined = undefined;
+
   const radioReporter = async (runDetails: any) => {
+    if (contextUpdateError !== undefined) {
+      radio.emit(
+        "logFailure",
+        `\nStopped the run: ${contextUpdateError.message}\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
     reporter(runDetails, radio, "invariant", failureStatistics.get());
 
     // Persist failures for regression testing.
@@ -430,6 +449,10 @@ const invariantTest = async (
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
       failureStatistics.track(async (r) => {
+        if (contextUpdateError !== undefined) {
+          return;
+        }
+
         for (const [index, selectedFunction] of r.selectedFunctions.entries()) {
           const [sutCallerWallet, sutCallerAddress] = r.sutCallers[index];
 
@@ -474,29 +497,6 @@ const invariantTest = async (
                 selectedFunction.name
               ];
 
-              // Invariants would read a stale context, so stop the run.
-              let contextUpdate: string | undefined = undefined;
-              try {
-                const { result } = simnet.callPrivateFn(
-                  r.rendezvousContractId,
-                  "update-context",
-                  [Cl.stringAscii(selectedFunction.name), Cl.uint(calls)],
-                  simnet.deployer,
-                );
-                const json = cvToJSON(result);
-                if (!json.success || !json.value) {
-                  contextUpdate = `returned ${cvToString(result)}`;
-                }
-              } catch (error) {
-                contextUpdate = String(error);
-              }
-              if (contextUpdate !== undefined) {
-                throw new ContextUpdateError(
-                  `Could not update the context for ${selectedFunction.name}: ` +
-                    contextUpdate,
-                );
-              }
-
               // Function call passed.
               radio.emit(
                 "logMessage",
@@ -508,6 +508,29 @@ const invariantTest = async (
                   `${printedFunctionArgs} ` +
                   green(selectedFunctionClarityResult),
               );
+
+              // Invariants would read a stale context, so stop the run.
+              let contextUpdate: string | undefined = undefined;
+              try {
+                const { result } = simnet.callPrivateFn(
+                  r.rendezvousContractId,
+                  "update-context",
+                  [Cl.stringAscii(selectedFunction.name), Cl.uint(calls)],
+                  simnet.deployer,
+                );
+                if (!isOkTrue(result)) {
+                  contextUpdate = `returned ${cvToString(result)}`;
+                }
+              } catch (error) {
+                contextUpdate = String(error);
+              }
+              if (contextUpdate !== undefined) {
+                contextUpdateError = new ContextUpdateError(
+                  `Could not update the context for ${selectedFunction.name}: ` +
+                    contextUpdate,
+                );
+                throw contextUpdateError;
+              }
 
               try {
                 if (dialerRegistry !== undefined) {
@@ -728,6 +751,17 @@ export const initializeLocalContext = (
 });
 
 /**
+ * Checks that an `update-context` call returned `(ok true)`, as `map-set`
+ * does. `cvToJSON` wraps the boolean, so `(ok false)` has a truthy `value`.
+ * @param result The Clarity value returned by `update-context`.
+ * @returns Whether the result is `(ok true)`.
+ */
+const isOkTrue = (result: ClarityValue) => {
+  const json = cvToJSON(result);
+  return json.success === true && json.value?.value === true;
+};
+
+/**
  * Initializes the Clarity context by calling update-context for each SUT
  * function.
  * @param simnet The Simnet instance.
@@ -746,8 +780,7 @@ export const initializeClarityContext = (
       [Cl.stringAscii(fn.name), Cl.uint(0)],
       simnet.deployer,
     );
-    const jsonResult = cvToJSON(initialize);
-    if (!jsonResult.value || !jsonResult.success) {
+    if (!isOkTrue(initialize)) {
       throw new Error(
         `Failed to initialize the context for function: ${fn.name}.`,
       );

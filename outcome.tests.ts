@@ -26,6 +26,7 @@ const run = async (
   source: string,
   type: "test" | "invariant" = "test",
   bail = true,
+  regr = false,
 ) => {
   const directory = mkdtempSync(join(tmpdir(), "rendezvous-test-outcome-"));
   mkdirSync(join(directory, "settings"));
@@ -87,7 +88,7 @@ balance = 100000000000000
         17,
         20,
         bail,
-        false,
+        regr,
         radio,
         accounts,
         [simnet.deployer],
@@ -102,7 +103,7 @@ balance = 100000000000000
         20,
         undefined,
         bail,
-        false,
+        regr,
         radio,
         accounts,
         [simnet.deployer],
@@ -169,6 +170,29 @@ describe("Property testing outcomes", () => {
     expect(result.exitCode).toBe(0);
   });
 
+  it("fails the run when a discard function is invalid", async () => {
+    const result = await run(
+      "(define-read-only (can-test-pass (x uint)) true) " +
+        "(define-private (test-pass) (ok true))",
+    );
+    expect(result.logs).toContain("Parameter mismatch");
+    expect(result.logs).not.toContain("properties passed");
+    expect(result.exitCode).toBe(1);
+  });
+
+  it("flags a regression run without regressions as unchecked", async () => {
+    vi.spyOn(persistence, "loadFailures").mockReturnValue([]);
+    const result = await run(
+      "(define-private (test-pass) (ok true))",
+      "test",
+      true,
+      true,
+    );
+    expect(result.logs).toContain("0 regressions");
+    expect(result.unchecked).toBe(1);
+    expect(result.exitCode).toBe(0);
+  });
+
   it("reports passing tests as passed", async () => {
     const result = await run("(define-private (test-pass) (ok true))");
     expect(result.exitCode).toBe(0);
@@ -192,7 +216,7 @@ describe("Property testing outcomes", () => {
   )("counts %s as a single failure (bail: %j)", async (_, source, bail) => {
     const result = await run(source, "test", bail);
     expect(result.exitCode).toBe(1);
-    expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1/);
+    expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1\b/);
     expect(result.persisted).toBe(1);
   });
 });
@@ -219,7 +243,7 @@ describe("Invariant testing outcomes", () => {
         bail,
       );
       expect(result.exitCode).toBe(1);
-      expect(result.logs).toMatch(/FAILED[\s│└─]*invariant-fail: x1/);
+      expect(result.logs).toMatch(/FAILED[\s│└─]*invariant-fail: x1\b/);
     },
   );
 
@@ -234,19 +258,48 @@ describe("Invariant testing outcomes", () => {
       "(if (> calls u0) (err u7) (ok (map-set context name calls)))",
       "returned (err u7)",
     ],
+    [
+      "returns (ok false)",
+      "(if (> calls u0) (ok false) (ok (map-set context name calls)))",
+      "returned (ok false)",
+    ],
   ])("stops the run when updating the context %s", async (_, body, reason) => {
-    const result = await run(
-      `(define-map context (string-ascii 100) uint)
+    for (const bail of [true, false]) {
+      const result = await run(
+        `(define-map context (string-ascii 100) uint)
 (define-private (update-context (name (string-ascii 100)) (calls uint))
   ${body})
 (define-public (touch) (ok true))
 (define-read-only (invariant-pass) true)`,
+        "invariant",
+        bail,
+      );
+      expect(result.logs).toContain(
+        "Stopped the run: Could not update the context for touch:",
+      );
+      expect(result.logs).toContain(reason);
+      // It is not an invariant failure, so it is neither blamed on an
+      // invariant nor persisted as a regression.
+      expect(result.logs).not.toContain("Counterexample");
+      expect(result.logs).not.toContain("invariant-pass: x");
+      expect(result.logs).not.toContain("OK, invariants passed");
+      expect(result.persisted).toBe(0);
+      expect(result.exitCode).toBe(1);
+    }
+  });
+
+  it("flags a regression run without regressions as unchecked", async () => {
+    vi.spyOn(persistence, "loadFailures").mockReturnValue([]);
+    const result = await run(
+      `${context} (define-public (touch) (ok true))
+(define-read-only (invariant-pass) true)`,
       "invariant",
+      true,
+      true,
     );
-    expect(result.logs).toContain("Could not update the context for touch:");
-    expect(result.logs).toContain(reason);
-    expect(result.logs).not.toContain("OK, invariants passed");
-    expect(result.exitCode).toBe(1);
+    expect(result.logs).toContain("0 regressions");
+    expect(result.unchecked).toBe(1);
+    expect(result.exitCode).toBe(0);
   });
 
   it("flags a run without invariants as unchecked", async () => {

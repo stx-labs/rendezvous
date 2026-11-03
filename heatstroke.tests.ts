@@ -7,7 +7,7 @@ import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import { Cl, cvToString, type ClarityValue } from "@stacks/transactions";
 import fc from "fast-check";
 
-import { reporter } from "./heatstroke";
+import { reporter, trackFailureStatistics } from "./heatstroke";
 import { FalsifiedInvariantError } from "./invariant";
 import { PropertyTestError } from "./property";
 import { getContractNameFromContractId } from "./shared";
@@ -864,5 +864,61 @@ describe("Unchecked tests and invariants reporting", () => {
     const invariant = report("invariant", [["invariant-a", 5]]);
     expect(invariant.logs).toContain("OK, invariants passed after 5 runs.");
     expect(invariant.unchecked).toBe(0);
+  });
+});
+
+describe("Failure statistics tracking", () => {
+  it("keeps counting after a skipped precondition", async () => {
+    const statistics = {
+      test: {
+        successful: new Map([["test-a", 0]]),
+        discarded: new Map([["test-a", 0]]),
+        failed: new Map([["test-a", 0]]),
+      },
+    };
+    const tracked = trackFailureStatistics(statistics);
+    let calls = 0;
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constant(0),
+        tracked.track(async () => {
+          fc.pre(calls++ > 0);
+          statistics.test.successful.set(
+            "test-a",
+            statistics.test.successful.get("test-a")! + 1,
+          );
+        }),
+      ),
+      { numRuns: 3 },
+    );
+    expect(tracked.get().test!.successful.get("test-a")).toBe(3);
+  });
+
+  it("keeps the statistics from the first failure", async () => {
+    const statistics = {
+      test: {
+        successful: new Map([["test-a", 0]]),
+        discarded: new Map([["test-a", 0]]),
+        failed: new Map([["test-a", 0]]),
+      },
+    };
+    const tracked = trackFailureStatistics(statistics);
+    await expect(
+      fc.assert(
+        fc.asyncProperty(
+          fc.nat(),
+          tracked.track(async () => {
+            statistics.test.failed.set(
+              "test-a",
+              statistics.test.failed.get("test-a")! + 1,
+            );
+            throw new Error("fail");
+          }),
+        ),
+        { numRuns: 3, seed: 1 },
+      ),
+    ).rejects.toThrow();
+    expect(statistics.test.failed.get("test-a")).toBeGreaterThan(1);
+    expect(tracked.get().test!.failed.get("test-a")).toBe(1);
   });
 });

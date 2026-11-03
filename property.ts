@@ -177,6 +177,8 @@ export const checkProperties = async (
   );
 
   if (hasDiscardFunctionErrors) {
+    // The validation errors are already logged. No test can run, so fail.
+    process.exitCode = 1;
     return;
   }
 
@@ -217,6 +219,11 @@ export const checkProperties = async (
         `${regressions.length} regressions`,
       )} for the ${targetContractName} contract.\n`,
     );
+
+    if (regressions.length === 0) {
+      // Nothing is replayed, so nothing is checked.
+      radio.emit("unchecked");
+    }
 
     for (const regression of regressions) {
       emitPropertyRegressionTestHeader(

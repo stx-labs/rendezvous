@@ -460,6 +460,11 @@ The contract source, test functions, and **context** all live in the same file. 
 Rendezvous uses a **context** to track function calls and execution details during invariant testing. This allows for better tracking of execution details and invariant validation.
 
 > **Important:** Every contract tested with Rendezvous **invariant testing** must include the `context` map and the `update-context` private function. During invariant testing, Rendezvous calls public functions and uses `update-context` to track successful executions. This tracking enables invariants to reason about how many times each function has been called. If these are missing during invariant testing, Rendezvous will throw a runtime error. The context is not required for property-based testing.
+>
+> `update-context` must return `(ok true)`, as `(ok (map-set ...))` does. If it
+> throws or returns anything else, invariants would read a stale context, so
+> Rendezvous stops the run with exit code 1. This is not saved as a
+> regression.
 
 ### How the Context Works
 
@@ -587,10 +592,12 @@ Discarded cases do not count as checks. Rendezvous warns instead of printing
 a passing summary if any test has no passing case (all its cases were
 discarded or it was never selected), or an invariant was never selected.
 Invariant campaigns where every public call throws warn as inconclusive.
-Tests or invariants skipped for missing trait implementations, and contracts
-without any, also count as unchecked.
+Tests or invariants skipped for missing trait implementations, contracts
+without any, and `--regr` runs without saved regressions also count as
+unchecked.
 Default exit codes are unchanged; `--fail-on-unchecked` (config key
 `fail_on_unchecked`) makes any of these fail the run with exit code 1.
+An invalid discard function always fails the run, since no test can run.
 
 ## Custom Manifest Files
 

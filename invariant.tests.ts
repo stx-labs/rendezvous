@@ -111,7 +111,7 @@ describe("Simnet contracts operations", () => {
 });
 
 describe("Custom dialers", () => {
-  it("executes the pre-dialers from the very first run", async () => {
+  it("executes the pre-dialers from the very first SUT call", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
       resolve(__dirname, "example"),
@@ -119,32 +119,21 @@ describe("Custom dialers", () => {
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
 
-    // The dialer module is loaded through a dynamic import in the same
-    // process, so it can report its calls through a global counter.
+    // A fresh dialer path forces a cold dynamic import, so the runs would
+    // start before registration completes if it were not awaited. The dialer
+    // runs in the same process and reports its calls through a global.
+    const preDialer = vi.fn();
+    vi.stubGlobal("__rvPreDialer", preDialer);
     const dialPath = join(tempDir, "record-calls-dialer.mjs");
     writeFileSync(
       dialPath,
-      "export async function preRecordCall() {\n" +
-        "  globalThis.__rvPreDialerCalls += 1;\n" +
-        "}\n",
+      "export const preRecordCall = () => globalThis.__rvPreDialer();\n",
     );
-    const globals = globalThis as typeof globalThis & {
-      __rvPreDialerCalls?: number;
-    };
-    globals.__rvPreDialerCalls = 0;
+    const callPublicFn = vi.spyOn(simnet, "callPublicFn");
 
-    const rendezvousList = [
-      ...getSimnetDeployerContractsInterfaces(simnet).keys(),
-    ].filter(
-      (deployedContract) =>
-        getContractNameFromContractId(deployedContract) === "counter",
-    );
-    const rendezvousAllFunctions = getFunctionsFromContractInterfaces(
-      new Map(
-        [...getSimnetDeployerContractsInterfaces(simnet)].filter(
-          ([contractId]) => rendezvousList.includes(contractId),
-        ),
-      ),
+    const contractsInterfaces = getSimnetDeployerContractsInterfaces(simnet);
+    const rendezvousList = [...contractsInterfaces.keys()].filter(
+      (contractId) => getContractNameFromContractId(contractId) === "counter",
     );
     const { eligibleAccounts, allAddresses } = resolveAccounts(
       simnet.getAccounts(),
@@ -152,29 +141,30 @@ describe("Custom dialers", () => {
     );
 
     // Exercise
-
-    // A single run selects at least one SUT function, so the pre-dialer must
-    // have fired at least once by the time the run completes.
     await checkInvariants(
       simnet,
-      async () => {},
+      async () => {}, // resetSession
       rendezvousList,
-      rendezvousAllFunctions,
-      0,
-      1,
+      getFunctionsFromContractInterfaces(contractsInterfaces),
+      0, // seed
+      1, // runs
       dialPath,
-      true,
-      false,
+      true, // bail
+      false, // regr
       new EventEmitter(),
       eligibleAccounts,
       allAddresses,
     );
 
     // Verify
-    expect(globals.__rvPreDialerCalls).toBeGreaterThan(0);
+
+    // Every SUT call, including the first one, is preceded by the pre-dialer.
+    expect(callPublicFn).toHaveBeenCalled();
+    expect(preDialer).toHaveBeenCalledTimes(callPublicFn.mock.calls.length);
 
     // Teardown
-    delete globals.__rvPreDialerCalls;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     rmSync(tempDir, { recursive: true, force: true });
   });
 });

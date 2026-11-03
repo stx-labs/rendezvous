@@ -1,10 +1,16 @@
-import { rmSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import { rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 import { Cl } from "@stacks/transactions";
 
-import { initializeClarityContext, initializeLocalContext } from "./invariant";
+import { resolveAccounts } from "./config";
+import {
+  checkInvariants,
+  initializeClarityContext,
+  initializeLocalContext,
+} from "./invariant";
 import {
   getContractNameFromContractId,
   getFunctionsFromContractInterfaces,
@@ -100,6 +106,75 @@ describe("Simnet contracts operations", () => {
     expect(actualContext).toEqual(expectedContext);
 
     // Teardown
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+});
+
+describe("Custom dialers", () => {
+  it("executes the pre-dialers from the very first run", async () => {
+    // Setup
+    const tempDir = createIsolatedTestEnvironment(
+      resolve(__dirname, "example"),
+      isolatedTestEnvPrefix,
+    );
+    const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
+
+    // The dialer module is loaded through a dynamic import in the same
+    // process, so it can report its calls through a global counter.
+    const dialPath = join(tempDir, "record-calls-dialer.mjs");
+    writeFileSync(
+      dialPath,
+      "export async function preRecordCall() {\n" +
+        "  globalThis.__rvPreDialerCalls += 1;\n" +
+        "}\n",
+    );
+    const globals = globalThis as typeof globalThis & {
+      __rvPreDialerCalls?: number;
+    };
+    globals.__rvPreDialerCalls = 0;
+
+    const rendezvousList = [
+      ...getSimnetDeployerContractsInterfaces(simnet).keys(),
+    ].filter(
+      (deployedContract) =>
+        getContractNameFromContractId(deployedContract) === "counter",
+    );
+    const rendezvousAllFunctions = getFunctionsFromContractInterfaces(
+      new Map(
+        [...getSimnetDeployerContractsInterfaces(simnet)].filter(
+          ([contractId]) => rendezvousList.includes(contractId),
+        ),
+      ),
+    );
+    const { eligibleAccounts, allAddresses } = resolveAccounts(
+      simnet.getAccounts(),
+      undefined,
+    );
+
+    // Exercise
+
+    // A single run selects at least one SUT function, so the pre-dialer must
+    // have fired at least once by the time the run completes.
+    await checkInvariants(
+      simnet,
+      async () => {},
+      rendezvousList,
+      rendezvousAllFunctions,
+      0,
+      1,
+      dialPath,
+      true,
+      false,
+      new EventEmitter(),
+      eligibleAccounts,
+      allAddresses,
+    );
+
+    // Verify
+    expect(globals.__rvPreDialerCalls).toBeGreaterThan(0);
+
+    // Teardown
+    delete globals.__rvPreDialerCalls;
     rmSync(tempDir, { recursive: true, force: true });
   });
 });

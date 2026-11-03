@@ -324,7 +324,7 @@ const invariantTest = async (
     dial !== undefined ? new DialerRegistry(dial) : undefined;
 
   if (dialerRegistry !== undefined) {
-    dialerRegistry.registerDialers();
+    await dialerRegistry.registerDialers();
   }
 
   const statistics: Statistics = {

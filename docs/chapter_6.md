@@ -179,7 +179,7 @@ In this case, the seed is `426141810`. You can use it to rerun the exact same te
 rv root contract test --seed=426141810
 ```
 
-The `Path` line is fast-check's path to the counterexample, shown for diagnostics. Rendezvous has no option to replay a path: the seed alone reproduces the run.
+The `Path` line is fast-check's path to the counterexample, shown for diagnostics. Rendezvous has no option to replay a path: the seed reproduces the run, with at least as many `--runs` and the same `--dial`.
 
 **3. Stop After First Failure**
 

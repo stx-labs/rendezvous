@@ -219,7 +219,7 @@ describe("Property testing outcomes", () => {
     expect(result.exitCode).toBe(1);
     expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1\b/);
     expect(result.paths).toEqual([expect.stringMatching(/^\d+(:\d+)*$/)]);
-    expect(result.logs).toContain(`Path : ${result.paths[0]}`);
+    expect(result.logs.split("\n")).toContain(`Path : ${result.paths[0]}`);
   });
 });
 
@@ -247,7 +247,7 @@ describe("Invariant testing outcomes", () => {
       expect(result.exitCode).toBe(1);
       expect(result.logs).toMatch(/FAILED[\s│└─]*invariant-fail: x1\b/);
       expect(result.paths).toEqual([expect.stringMatching(/^\d+(:\d+)*$/)]);
-      expect(result.logs).toContain(`Path : ${result.paths[0]}`);
+      expect(result.logs.split("\n")).toContain(`Path : ${result.paths[0]}`);
     },
   );
 

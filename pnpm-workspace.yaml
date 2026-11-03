@@ -1,0 +1,24 @@
+packages:
+  - example
+
+# Supply-chain hardening on top of pnpm's defaults (exotic transitive sources
+# and unreviewed build scripts are already blocked).
+# See https://pnpm.io/supply-chain-security
+
+# Only install versions published at least 5 days ago (in minutes).
+# Setting it explicitly also makes it strict: resolution fails rather than
+# falling back to a newer version.
+minimumReleaseAge: 7200
+
+# Fail if a package's trust evidence (trusted publisher, provenance) is weaker
+# than for an earlier release.
+trustPolicy: no-downgrade
+
+# Refuse to install with an unsupported pnpm version, or a Node.js version a
+# dependency (such as @stacks/clarinet-sdk) does not support.
+engineStrict: true
+
+# Our own package: the post-release workflow bumps the example to it as soon as
+# it is published.
+minimumReleaseAgeExclude:
+  - "@stacks/rendezvous"

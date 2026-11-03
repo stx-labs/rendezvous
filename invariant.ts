@@ -5,6 +5,7 @@ import type { Simnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import {
   Cl,
+  ClarityType,
   cvToJSON,
   cvToString,
   type ClarityValue,
@@ -254,6 +255,7 @@ export const checkInvariants = async (
         allAddresses,
         functions,
         invariants,
+        projectTraitImplementations,
       });
     }
   } else {
@@ -276,6 +278,7 @@ export const checkInvariants = async (
       allAddresses,
       functions,
       invariants,
+      projectTraitImplementations,
     });
   }
 };
@@ -302,18 +305,26 @@ const invariantTest = async (
     allAddresses,
     functions,
     invariants,
+    projectTraitImplementations,
   } = config;
 
   // Pre-build one fast-check arbitrary per SUT and invariant function via
   // the public library API, so invariant runs exercise the same strategy
   // pipeline as library consumers. `allAddresses` is threaded through so
   // any upstream account filtering (e.g. user-restricted accounts) is
-  // honored.
+  // honored. The trait implementations are passed in so they are not
+  // re-extracted from the simnet for every function.
   const sutStrategies = new Map<string, fc.Arbitrary<ClarityValue[]>>(
-    functions.map((fn) => [fn.name, strategyFor(simnet, fn, allAddresses)]),
+    functions.map((fn) => [
+      fn.name,
+      strategyFor(simnet, fn, allAddresses, projectTraitImplementations),
+    ]),
   );
   const invariantStrategies = new Map<string, fc.Arbitrary<ClarityValue[]>>(
-    invariants.map((fn) => [fn.name, strategyFor(simnet, fn, allAddresses)]),
+    invariants.map((fn) => [
+      fn.name,
+      strategyFor(simnet, fn, allAddresses, projectTraitImplementations),
+    ]),
   );
 
   /**
@@ -451,8 +462,6 @@ const invariantTest = async (
               sutCallerAddress,
             );
 
-            const functionCallResultJson = cvToJSON(functionCall.result);
-
             // Reaching this point means the function call went through, but it
             // may still have returned an error result. Get the result, convert
             // it to Clarity string format, and report it to improve the user
@@ -462,7 +471,7 @@ const invariantTest = async (
               functionCall.result,
             );
 
-            if (functionCallResultJson.success) {
+            if (functionCall.result.type === ClarityType.ResponseOk) {
               statistics.sut!.successful.set(
                 selectedFunction.name,
                 statistics.sut!.successful.get(selectedFunction.name)! + 1,
@@ -570,11 +579,9 @@ const invariantTest = async (
             invariantCallerAddress,
           );
 
-          const invariantCallResultJson = cvToJSON(invariantCallResult);
-
           const invariantCallClarityResult = cvToString(invariantCallResult);
 
-          if (invariantCallResultJson.value === true) {
+          if (invariantCallResult.type === ClarityType.BoolTrue) {
             statistics.invariant!.successful.set(
               r.selectedInvariant.name,
               statistics.invariant!.successful.get(r.selectedInvariant.name)! +
@@ -650,7 +657,7 @@ const invariantTest = async (
       numRuns: runs,
       reporter: radioReporter,
       seed,
-      verbose: true,
+      verbose: false,
     },
   );
 };

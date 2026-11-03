@@ -100,12 +100,13 @@ export const main = async () => {
     radio.emit("logMessage", "Simnet session reset.");
   };
 
+  const deployerContractsInterfaces =
+    getSimnetDeployerContractsInterfaces(simnet);
+
   /**
    * The list of contract IDs for the SUT contract names, as per the simnet.
    */
-  const rendezvousList = [
-    ...getSimnetDeployerContractsInterfaces(simnet).keys(),
-  ].filter(
+  const rendezvousList = [...deployerContractsInterfaces.keys()].filter(
     (deployedContract) =>
       getContractNameFromContractId(deployedContract) ===
       runConfig.sutContractName,
@@ -121,7 +122,7 @@ export const main = async () => {
 
   const rendezvousAllFunctions = getFunctionsFromContractInterfaces(
     new Map(
-      [...getSimnetDeployerContractsInterfaces(simnet)].filter(([contractId]) =>
+      [...deployerContractsInterfaces].filter(([contractId]) =>
         rendezvousList.includes(contractId),
       ),
     ),

@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 
 import type { Simnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
-import { cvToJSON, cvToString, type ClarityValue } from "@stacks/transactions";
+import {
+  ClarityType,
+  cvToString,
+  type ClarityValue,
+} from "@stacks/transactions";
 import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
@@ -243,6 +247,7 @@ export const checkProperties = async (
         allAddresses,
         testFunctions,
         testContractsPairedFunctions,
+        projectTraitImplementations,
       });
     }
   } else {
@@ -264,6 +269,7 @@ export const checkProperties = async (
       allAddresses,
       testFunctions,
       testContractsPairedFunctions,
+      projectTraitImplementations,
     });
   }
 };
@@ -289,14 +295,20 @@ const propertyTest = async (
     allAddresses,
     testFunctions,
     testContractsPairedFunctions,
+    projectTraitImplementations,
   } = config;
 
   // Pre-build one fast-check arbitrary per test function via the public
   // library API, so property runs exercise the same strategy pipeline as
   // library consumers. `allAddresses` is threaded through so any upstream
-  // account filtering (e.g. user-restricted accounts) is honored.
+  // account filtering (e.g. user-restricted accounts) is honored. The trait
+  // implementations are passed in so they are not re-extracted from the
+  // simnet for every function.
   const strategies = new Map<string, fc.Arbitrary<ClarityValue[]>>(
-    testFunctions.map((fn) => [fn.name, strategyFor(simnet, fn, allAddresses)]),
+    testFunctions.map((fn) => [
+      fn.name,
+      strategyFor(simnet, fn, allAddresses, projectTraitImplementations),
+    ]),
   );
 
   const statistics: Statistics = {
@@ -416,10 +428,8 @@ const propertyTest = async (
               testCallerAddress,
             );
 
-            const testFunctionCallResultJson = cvToJSON(testFunctionCallResult);
-
             const discardedInPlace = isTestDiscardedInPlace(
-              testFunctionCallResultJson,
+              testFunctionCallResult,
             );
 
             const testFunctionCallClarityResult = cvToString(
@@ -445,8 +455,8 @@ const propertyTest = async (
               );
             } else if (
               !discardedInPlace &&
-              testFunctionCallResultJson.success &&
-              testFunctionCallResultJson.value.value === true
+              testFunctionCallResult.type === ClarityType.ResponseOk &&
+              testFunctionCallResult.value.type === ClarityType.BoolTrue
             ) {
               statistics.test!.successful.set(
                 r.selectedTestFunction.name,
@@ -517,7 +527,7 @@ const propertyTest = async (
       numRuns: runs,
       reporter: radioReporter,
       seed,
-      verbose: true,
+      verbose: false,
     },
   );
 };
@@ -585,9 +595,9 @@ const filterTestFunctions = (
     ]),
   );
 
-export const isTestDiscardedInPlace = (testFunctionCallResultJson: any) =>
-  testFunctionCallResultJson.success === true &&
-  testFunctionCallResultJson.value.value === false;
+export const isTestDiscardedInPlace = (testFunctionCallResult: ClarityValue) =>
+  testFunctionCallResult.type === ClarityType.ResponseOk &&
+  testFunctionCallResult.value.type === ClarityType.BoolFalse;
 
 /**
  * Checks if the test function has to be discarded.
@@ -615,8 +625,7 @@ const isTestDiscarded = (
     selectedTestFunctionArgs,
     selectedCaller,
   );
-  const jsonDiscardFunctionCallResult = cvToJSON(discardFunctionCallResult);
-  return jsonDiscardFunctionCallResult.value === false;
+  return discardFunctionCallResult.type === ClarityType.BoolFalse;
 };
 
 /**

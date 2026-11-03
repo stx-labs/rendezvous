@@ -313,7 +313,7 @@ The regression file stores failures grouped by test type (property-based tests v
       "seed": 901717247,
       "dial": "example/sip010.cjs",
       "numRuns": 15,
-      "counterexamplePath": "2:1:0",
+      "counterexamplePath": "14:1:0",
       "timestamp": 1767886534833
     },
     {
@@ -344,7 +344,9 @@ Each failure record includes:
 - `timestamp` – When the failure was discovered (Unix timestamp in milliseconds)
 - `dial` (optional) – Path to the dialer file used during the test
 - `counterexamplePath` (optional) – fast-check shrink metadata for diagnostics;
-  it is not an exact replay trace
+  it is not an exact replay trace. A regression run adds it to a record saved
+  without one when the replay fails after the same number of runs and with the
+  same dialer, so the regression file can change after a regression run.
 
 Failures are sorted by timestamp in descending order, with the most recent failures first.
 

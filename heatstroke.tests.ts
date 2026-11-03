@@ -218,7 +218,7 @@ describe("Custom reporter logging", () => {
       fc.assert(
         fc.property(
           fc.record({
-            path: asciiString(),
+            counterexamplePath: asciiString(),
             failed: fc.constant(true),
             numRuns: fc.nat(),
             seed: fc.nat(),
@@ -257,7 +257,7 @@ describe("Custom reporter logging", () => {
             ),
           }),
           (r: {
-            path: string;
+            counterexamplePath: string;
             failed: boolean;
             numRuns: number;
             seed: number;
@@ -290,7 +290,7 @@ describe("Custom reporter logging", () => {
             });
 
             const runDetails = {
-              counterexamplePath: r.path,
+              counterexamplePath: r.counterexamplePath,
               failed: r.failed,
               numRuns: r.numRuns,
               seed: r.seed,
@@ -320,7 +320,7 @@ describe("Custom reporter logging", () => {
             const expectedMessages = [
               `\nError: Property failed after ${r.numRuns} tests.`,
               `Seed : ${r.seed}`,
-              `Path : ${r.path}`,
+              `Path : ${r.counterexamplePath}`,
               `\nCounterexample:`,
               `- Contract : ${getContractNameFromContractId(
                 rendezvousContractId,
@@ -382,7 +382,7 @@ describe("Custom reporter logging", () => {
       fc.assert(
         fc.property(
           fc.record({
-            path: asciiString(),
+            counterexamplePath: asciiString(),
             failed: fc.constant(false),
             numRuns: fc.nat(),
             seed: fc.nat(),
@@ -422,7 +422,7 @@ describe("Custom reporter logging", () => {
             ),
           }),
           (r: {
-            path: string;
+            counterexamplePath: string;
             failed: boolean;
             numRuns: number;
             seed: number;
@@ -454,7 +454,7 @@ describe("Custom reporter logging", () => {
             });
 
             const runDetails = {
-              counterexamplePath: r.path,
+              counterexamplePath: r.counterexamplePath,
               failed: r.failed,
               numRuns: r.numRuns,
               seed: r.seed,
@@ -613,7 +613,7 @@ describe("Custom reporter logging", () => {
       fc.assert(
         fc.property(
           fc.record({
-            path: asciiString(),
+            counterexamplePath: asciiString(),
             failed: fc.constant(true),
             numRuns: fc.nat(),
             seed: fc.nat(),
@@ -634,7 +634,7 @@ describe("Custom reporter logging", () => {
             ),
           }),
           (r: {
-            path: string;
+            counterexamplePath: string;
             failed: boolean;
             numRuns: number;
             seed: number;
@@ -659,7 +659,7 @@ describe("Custom reporter logging", () => {
             });
 
             const runDetails = {
-              counterexamplePath: r.path,
+              counterexamplePath: r.counterexamplePath,
               failed: r.failed,
               numRuns: r.numRuns,
               seed: r.seed,
@@ -682,7 +682,7 @@ describe("Custom reporter logging", () => {
             const expectedMessages = [
               `\nError: Property failed after ${r.numRuns} tests.`,
               `Seed : ${r.seed}`,
-              `Path : ${r.path}`,
+              `Path : ${r.counterexamplePath}`,
               `\nCounterexample:`,
               `- Contract : ${getContractNameFromContractId(
                 rendezvousContractId,

@@ -410,7 +410,7 @@ describe("Failure Persistence", () => {
       );
     });
 
-    it("persists paths and reads records from older files", () => {
+    it("persists the counterexample path", () => {
       const customBaseDir = createTemporaryCustomTestBaseDir("paths");
       const options = { baseDir: customBaseDir };
 
@@ -425,15 +425,6 @@ describe("Failure Persistence", () => {
 
         const [failure] = loadFailures(TEST_CONTRACT_ID, "test", options);
         expect(failure.counterexamplePath).toBe("0:1");
-
-        const record = { seed: 17, numRuns: 20, timestamp: 123 };
-        writeFileSync(
-          getFailureFilePath(TEST_CONTRACT_ID, customBaseDir),
-          JSON.stringify({ invariant: [record], test: [] }),
-        );
-        expect(loadFailures(TEST_CONTRACT_ID, "invariant", options)).toEqual([
-          record,
-        ]);
       } finally {
         rmSync(customBaseDir, { recursive: true, force: true });
       }
@@ -442,7 +433,7 @@ describe("Failure Persistence", () => {
     it("backfills the path on a record saved without one", () => {
       const customBaseDir = createTemporaryCustomTestBaseDir("backfill");
       const options = { baseDir: customBaseDir };
-      const record = { seed: 17, numRuns: 20, timestamp: 123 };
+      const record = { seed: 17, numRuns: 100, timestamp: 123 };
 
       try {
         writeFileSync(
@@ -467,6 +458,36 @@ describe("Failure Persistence", () => {
 
         expect(loadFailures(TEST_CONTRACT_ID, "test", options)).toEqual([
           { ...record, counterexamplePath: "2:1:0" },
+        ]);
+      } finally {
+        rmSync(customBaseDir, { recursive: true, force: true });
+      }
+    });
+
+    it.each([
+      ["run count", { numRuns: 20 }, undefined],
+      ["dialer", { numRuns: 100, dial: "a.cjs" }, "b.cjs"],
+    ])("does not backfill the path when the %s differs", (_, saved, dial) => {
+      const customBaseDir = createTemporaryCustomTestBaseDir("mismatch");
+      const options = { baseDir: customBaseDir };
+      const record = { seed: 17, timestamp: 123, ...saved };
+
+      try {
+        writeFileSync(
+          getFailureFilePath(TEST_CONTRACT_ID, customBaseDir),
+          JSON.stringify({ invariant: [record], test: [] }),
+        );
+
+        persistFailure(
+          { ...createMockRunDetails(17), counterexamplePath: "2:1:0" },
+          "invariant",
+          TEST_CONTRACT_ID,
+          dial,
+          options,
+        );
+
+        expect(loadFailures(TEST_CONTRACT_ID, "invariant", options)).toEqual([
+          record,
         ]);
       } finally {
         rmSync(customBaseDir, { recursive: true, force: true });

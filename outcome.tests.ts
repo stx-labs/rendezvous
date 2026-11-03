@@ -19,8 +19,9 @@ afterEach(() => {
 
 /**
  * Runs Rendezvous against a single contract in a temporary Clarinet project
- * without requirements and returns the logs, exit code and the number of
- * persisted failures. Without bailing, fast-check shrinks the failure.
+ * without requirements and returns the logs, exit code, the number of
+ * persisted failures and their counterexample paths. Without bailing,
+ * fast-check shrinks the failure.
  */
 const run = async (
   source: string,
@@ -113,6 +114,7 @@ balance = 100000000000000
       logs: stripVTControlCharacters(logs.join("\n")),
       exitCode: process.exitCode,
       persisted: persist.mock.calls.length,
+      paths: persist.mock.calls.map(([details]) => details.counterexamplePath),
       unchecked,
     };
   } finally {
@@ -350,4 +352,22 @@ describe("Invariant testing outcomes", () => {
     expect(result.logs).not.toContain("Warning:");
     expect(result.persisted).toBe(0);
   });
+});
+
+describe("Counterexample path", () => {
+  it.each([
+    ["test", "(define-private (test-fail) (err u1))"],
+    [
+      "invariant",
+      `${context} (define-public (touch) (ok true)) ` +
+        "(define-read-only (invariant-fail) false)",
+    ],
+  ] as const)(
+    "prints and persists the fast-check path (type: %s)",
+    async (type, source) => {
+      const result = await run(source, type, false);
+      expect(result.paths).toEqual([expect.stringMatching(/^\d+(:\d+)*$/)]);
+      expect(result.logs).toContain(`Path : ${result.paths[0]}`);
+    },
+  );
 });

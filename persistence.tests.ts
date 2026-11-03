@@ -17,8 +17,11 @@ const TEST_CONTRACT_ID = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter";
 
 const fileNameRegex = /^[a-zA-Z0-9_-]+$/;
 
+// Starts from an empty directory, so files left by a failed case, whose
+// teardown did not run, cannot leak into a shrinking rerun.
 const createTemporaryCustomTestBaseDir = (dirName: string) => {
   const path = join(temporaryTestBaseDir, dirName);
+  rmSync(path, { recursive: true, force: true });
   mkdirSync(path, { recursive: true });
   return path;
 };

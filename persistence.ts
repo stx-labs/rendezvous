@@ -117,7 +117,7 @@ export const persistFailure = (
     seed: runDetails.seed,
     dial,
     numRuns: runDetails.numRuns,
-    counterexamplePath: runDetails.counterexamplePath,
+    counterexamplePath: runDetails.counterexamplePath ?? undefined,
     timestamp: Date.now(),
   };
 

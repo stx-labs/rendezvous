@@ -421,7 +421,7 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 Rendezvous colors its output only when writing to a terminal, so redirected or piped output is plain text. It follows the standard environment variables:
 
 - `NO_COLOR=1` disables colors.
-- `FORCE_COLOR=1` enables colors even when the output is not a terminal, for example in CI logs:
+- `FORCE_COLOR=1` enables colors even when the output is not a terminal, for example in CI logs. It takes precedence over `NO_COLOR`.
 
 ```bash
 FORCE_COLOR=1 rv root contract test

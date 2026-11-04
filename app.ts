@@ -69,7 +69,7 @@ export const main = async () => {
   const radio = new EventEmitter();
   radio.on("logMessage", (log) => logger(log));
   radio.on("logInfo", (log) => logger(yellow(log), "info"));
-  radio.on("logFailure", (log) => logger(red(log), "error"));
+  radio.on("logFailure", (log) => logger(red(log, process.stderr), "error"));
 
   const runConfig = parseCliOrExit(process.argv.slice(2), radio);
 

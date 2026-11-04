@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -95,8 +95,7 @@ describe("CLI parsing with parseCli", () => {
 
   it("uses config file values exclusively when --config is provided, ignoring CLI flags", () => {
     // Arrange
-    const tempDir = join(tmpdir(), "rendezvous-test-parsecli");
-    mkdirSync(tempDir, { recursive: true });
+    const tempDir = mkdtempSync(join(tmpdir(), "rendezvous-test-parsecli-"));
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(
       configPath,
@@ -141,8 +140,9 @@ describe("CLI parsing with parseCli", () => {
 
   it("loads accounts from config file", () => {
     // Arrange
-    const tempDir = join(tmpdir(), "rendezvous-test-parsecli-accounts");
-    mkdirSync(tempDir, { recursive: true });
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "rendezvous-test-parsecli-accounts-"),
+    );
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(
       configPath,
@@ -215,8 +215,9 @@ describe("CLI parsing with parseCli", () => {
 
   it("warns when CLI flags are used alongside --config", () => {
     // Arrange
-    const tempDir = join(tmpdir(), "rendezvous-test-parsecli-warn-flags");
-    mkdirSync(tempDir, { recursive: true });
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "rendezvous-test-parsecli-warn-flags-"),
+    );
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(configPath, JSON.stringify({ seed: 1 }), "utf-8");
 
@@ -244,8 +245,9 @@ describe("CLI parsing with parseCli", () => {
 
   it("warns when config file contains unrecognized keys", () => {
     // Arrange
-    const tempDir = join(tmpdir(), "rendezvous-test-parsecli-warn-keys");
-    mkdirSync(tempDir, { recursive: true });
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "rendezvous-test-parsecli-warn-keys-"),
+    );
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(
       configPath,

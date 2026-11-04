@@ -1,4 +1,6 @@
 import type { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
+import { extname, join } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
@@ -7,8 +9,19 @@ import {
   type ConfigAccount,
   type RendezvousConfig,
 } from "./config";
-import { version } from "./package.json";
 import { LOG_DIVIDER } from "./shared";
+
+/**
+ * The package version, read at runtime: a static `import` of `package.json`
+ * would make tsc copy it into `dist/`. This module runs as TypeScript from the
+ * package root (tests) and as JavaScript from `dist/` once built.
+ */
+const { version } = JSON.parse(
+  readFileSync(
+    join(__dirname, extname(__filename) === ".ts" ? "." : "..", "package.json"),
+    "utf8",
+  ),
+) as { version: string };
 
 export const helpMessage = `
   rv v${version}

@@ -169,6 +169,9 @@ importers:
       '@stacks/clarinet-sdk':
         specifier: ^3.26.0
         version: 3.26.0
+      '@stacks/clarinet-sdk-wasm':
+        specifier: ^3.26.0
+        version: 3.26.0
       '@stacks/transactions':
         specifier: ^7.6.0
         version: 7.6.0
@@ -182,9 +185,6 @@ importers:
       '@ianvs/prettier-plugin-sort-imports':
         specifier: ^4.7.1
         version: 4.7.1(prettier@3.9.10)(supports-color@7.2.0)
-      '@stacks/clarinet-sdk-wasm':
-        specifier: ^3.26.0
-        version: 3.26.0
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6

@@ -10,8 +10,9 @@ export const observedAsyncProperty =
   (...args) => {
     const property = fc.asyncProperty(...args);
     if (radio.listenerCount("runComplete") > 0) {
-      property.afterEach(() => {
+      property.afterEach(async (previous) => {
         radio.emit("runComplete");
+        await previous();
       });
     }
     return property;

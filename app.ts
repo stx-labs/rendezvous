@@ -79,6 +79,15 @@ export const main = async () => {
     return;
   }
 
+  if (runConfig.coverage && process.env.CLARINET_DEBUG_PORT) {
+    radio.emit(
+      "logFailure",
+      "Coverage is not supported with CLARINET_DEBUG_PORT.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   logWarnings(radio, runConfig.warnings);
 
   // Unchecked tests and inconclusive campaigns fail only on request. The

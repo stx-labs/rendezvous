@@ -425,6 +425,8 @@ local project contracts. The verified SDK report excludes boot and imported
 mainnet requirement sources, even when a test calls those requirements.
 Only positive line and branch hit counts are covered. Coverage tracking is
 opt-in; ordinary default invocations leave it disabled.
+Coverage cannot be used with `CLARINET_DEBUG_PORT`: the Clarinet debug
+session does not support coverage reports.
 
 To keep the results, add `--coverage-lcov` for merged LCOV records, or
 `--coverage-json` for per-file totals and a curve of coverage increases:

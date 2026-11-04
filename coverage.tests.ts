@@ -168,6 +168,31 @@ describe("LCOV aggregation", () => {
 });
 
 describe("Evaluation observer", () => {
+  it("preserves an existing async afterEach hook while sampling", async () => {
+    const previousConfig = fc.readConfigureGlobal();
+    const radio = new EventEmitter();
+    const events: string[] = [];
+    radio.on("runComplete", () => events.push("sample"));
+    fc.configureGlobal({
+      asyncAfterEach: async () => {
+        await Promise.resolve();
+        events.push("cleanup");
+      },
+    });
+    try {
+      await fc.assert(
+        observedAsyncProperty(radio)(fc.constant(1), async () => {}),
+        { numRuns: 2 },
+      );
+      expect(events).toEqual(["sample", "cleanup", "sample", "cleanup"]);
+    } finally {
+      fc.resetConfigureGlobal();
+      if (previousConfig) {
+        fc.configureGlobal(previousConfig);
+      }
+    }
+  });
+
   it("preserves candidates without adding hooks by default", async () => {
     const radio = new EventEmitter();
     const observed: number[] = [];
@@ -351,6 +376,40 @@ describe("Coverage report after a run", () => {
 });
 
 describe("CLI coverage", () => {
+  it("rejects coverage when a Clarinet debug session is requested", async () => {
+    const initialArgv = process.argv;
+    const initialExitCode = process.exitCode;
+    const initialDebugPort = process.env.CLARINET_DEBUG_PORT;
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      process.argv = [
+        "node",
+        "app.js",
+        "example",
+        "counter",
+        "test",
+        "--coverage",
+      ];
+      process.env.CLARINET_DEBUG_PORT = "1234";
+      await main();
+      expect(process.exitCode).toBe(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Coverage is not supported with CLARINET_DEBUG_PORT.",
+        ),
+      );
+    } finally {
+      process.argv = initialArgv;
+      process.exitCode = initialExitCode;
+      if (initialDebugPort === undefined) {
+        delete process.env.CLARINET_DEBUG_PORT;
+      } else {
+        process.env.CLARINET_DEBUG_PORT = initialDebugPort;
+      }
+      error.mockRestore();
+    }
+  });
+
   it.each([
     ["reverse", "test"],
     ["counter", "invariant"],

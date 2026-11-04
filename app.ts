@@ -65,6 +65,24 @@ const parseCliOrExit = (
   }
 };
 
+/**
+ * Initializes the simnet session, reporting a project that fails to load
+ * (e.g. a compile error or an unsupported Clarity version for the epoch)
+ * instead of letting the rejection crash the process.
+ */
+const initSimnetOrFail = async (manifestPath: string, radio: EventEmitter) => {
+  try {
+    return await initSimnet(manifestPath);
+  } catch (err: unknown) {
+    radio.emit(
+      "logFailure",
+      `\nFailed to load the Clarinet project from ${manifestPath}:\n${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exitCode = 1;
+    return undefined;
+  }
+};
+
 export const main = async () => {
   const radio = new EventEmitter();
   radio.on("logMessage", (log) => logger(log));
@@ -96,7 +114,10 @@ export const main = async () => {
 
   logRunConfig(radio, runConfig, manifestPath);
 
-  const simnet = await initSimnet(manifestPath);
+  const simnet = await initSimnetOrFail(manifestPath, radio);
+  if (!simnet) {
+    return;
+  }
 
   const { eligibleAccounts, allAddresses } = resolveAccounts(
     simnet.getAccounts(),

@@ -609,6 +609,48 @@ describe("Contract selection", () => {
   });
 });
 
+describe("Project loading", () => {
+  it("logs an error instead of crashing when the project fails to load", async () => {
+    // Setup
+    const tempDir = createIsolatedTestEnvironment(
+      resolve(__dirname, "example"),
+      isolatedTestEnvPrefix,
+    );
+    const initialArgv = process.argv;
+    const initialExitCode = process.exitCode;
+    try {
+      writeFileSync(
+        join(tempDir, "contracts/counter.clar"),
+        "(define-public (broken) (ok (no-such-function)))",
+      );
+      process.argv = ["node", "app.js", tempDir, "counter", "test"];
+      const consoleErrors: string[] = [];
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation((message: string) => {
+        consoleErrors.push(message);
+      });
+      process.exitCode = undefined;
+
+      // Exercise
+      await expect(main()).resolves.toBeUndefined();
+
+      // Verify
+      expect(consoleErrors).toHaveLength(1);
+      expect(consoleErrors[0]).toContain(
+        `Failed to load the Clarinet project from ${join(tempDir, "Clarinet.toml")}:`,
+      );
+      expect(consoleErrors[0]).toContain("no-such-function");
+      expect(process.exitCode).toBe(1);
+    } finally {
+      // Teardown
+      process.exitCode = initialExitCode;
+      process.argv = initialArgv;
+      vi.restoreAllMocks();
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("Custom manifest detection", () => {
   it("returns the default manifest file name for the example project", () => {
     // Arrange

@@ -164,6 +164,7 @@ When Rendezvous detects an issue, it includes the seed needed to reproduce the t
 ```
 Error: Property failed after 2 tests.
 Seed : 426141810
+Counterexample path : 1:0
 
 Counterexample:
 ...
@@ -177,6 +178,8 @@ In this case, the seed is `426141810`. You can use it to rerun the exact same te
 ```bash
 rv root contract test --seed=426141810
 ```
+
+The `Counterexample path` line is fast-check's path to the counterexample, shown for diagnostics. Rendezvous has no option to replay a path: the seed reproduces the run, with at least as many `--runs` and the same `--dial`.
 
 **3. Stop After First Failure**
 
@@ -313,6 +316,7 @@ The regression file stores failures grouped by test type (property-based tests v
       "seed": 901717247,
       "dial": "example/sip010.cjs",
       "numRuns": 15,
+      "counterexamplePath": "14:1:0",
       "timestamp": 1767886534833
     },
     {
@@ -342,6 +346,7 @@ Each failure record includes:
 - `numRuns` – Number of test iterations needed for the failure to occur
 - `timestamp` – When the failure was discovered (Unix timestamp in milliseconds)
 - `dial` (optional) – Path to the dialer file used during the test
+- `counterexamplePath` (optional) – The fast-check path to the counterexample, for diagnostics only
 
 Failures are sorted by timestamp in descending order, with the most recent failures first.
 

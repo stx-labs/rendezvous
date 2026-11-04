@@ -1,11 +1,13 @@
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
+import type { RunDetailsCommon } from "fast-check";
 
-export interface RunDetails {
-  failed: boolean;
+// Fields picked from fast-check's own type, so a rename upstream fails the
+// build instead of silently reading undefined.
+export interface RunDetails
+  extends
+    Pick<RunDetailsCommon<unknown>, "failed" | "numRuns" | "seed">,
+    Partial<Pick<RunDetailsCommon<unknown>, "counterexamplePath">> {
   counterexample: CounterExample[];
-  numRuns: number;
-  seed: number;
-  path?: string;
   error?: Error;
   errorInstance?: Error;
 }

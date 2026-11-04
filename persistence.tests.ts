@@ -17,8 +17,10 @@ const TEST_CONTRACT_ID = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter";
 
 const fileNameRegex = /^[a-zA-Z0-9_-]+$/;
 
+// Start empty: a failed case skips its teardown, and shrinking reruns it.
 const createTemporaryCustomTestBaseDir = (dirName: string) => {
   const path = join(temporaryTestBaseDir, dirName);
+  rmSync(path, { recursive: true, force: true });
   mkdirSync(path, { recursive: true });
   return path;
 };
@@ -402,6 +404,43 @@ describe("Failure Persistence", () => {
               baseDir: customBaseDir,
             });
             expect(failures[0].dial).toBe(dial);
+
+            // Teardown
+            rmSync(customBaseDir, { recursive: true, force: true });
+          },
+        ),
+      );
+    });
+
+    it("includes the counterexample path in the failure record", () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            customBaseDirName: fc.stringMatching(fileNameRegex),
+            seed: fc.integer(),
+            counterexamplePath: fc.option(fc.string()),
+          }),
+          ({ customBaseDirName, seed, counterexamplePath }) => {
+            // Setup
+            const runDetails = {
+              ...createMockRunDetails(seed),
+              counterexamplePath,
+            };
+            const customBaseDir =
+              createTemporaryCustomTestBaseDir(customBaseDirName);
+
+            // Exercise
+            persistFailure(runDetails, "test", TEST_CONTRACT_ID, undefined, {
+              baseDir: customBaseDir,
+            });
+
+            // Verify
+            const failures = loadFailures(TEST_CONTRACT_ID, "test", {
+              baseDir: customBaseDir,
+            });
+            expect(failures[0].counterexamplePath).toBe(
+              counterexamplePath ?? undefined,
+            );
 
             // Teardown
             rmSync(customBaseDir, { recursive: true, force: true });

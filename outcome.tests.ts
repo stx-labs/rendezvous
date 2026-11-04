@@ -19,8 +19,9 @@ afterEach(() => {
 
 /**
  * Runs Rendezvous against a single contract in a temporary Clarinet project
- * without requirements and returns the logs, exit code and the number of
- * persisted failures. Without bailing, fast-check shrinks the failure.
+ * without requirements and returns the logs, exit code and the counterexample
+ * paths of the persisted failures. Without bailing, fast-check shrinks the
+ * failure.
  */
 const run = async (
   source: string,
@@ -112,7 +113,7 @@ balance = 100000000000000
     return {
       logs: stripVTControlCharacters(logs.join("\n")),
       exitCode: process.exitCode,
-      persisted: persist.mock.calls.length,
+      paths: persist.mock.calls.map(([details]) => details.counterexamplePath),
       unchecked,
     };
   } finally {
@@ -147,7 +148,7 @@ describe("Property testing outcomes", () => {
         "Warning: not checked after 20 runs: test-discard.",
       );
       expect(result.logs).not.toContain("properties passed");
-      expect(result.persisted).toBe(0);
+      expect(result.paths).toHaveLength(0);
     },
   );
 
@@ -217,7 +218,10 @@ describe("Property testing outcomes", () => {
     const result = await run(source, "test", bail);
     expect(result.exitCode).toBe(1);
     expect(result.logs).toMatch(/FAILED[\s│└─]*test-fail: x1\b/);
-    expect(result.persisted).toBe(1);
+    expect(result.paths).toEqual([expect.stringMatching(/^\d+(:\d+)*$/)]);
+    expect(result.logs.split("\n")).toContain(
+      `Counterexample path : ${result.paths[0]}`,
+    );
   });
 });
 
@@ -244,6 +248,10 @@ describe("Invariant testing outcomes", () => {
       );
       expect(result.exitCode).toBe(1);
       expect(result.logs).toMatch(/FAILED[\s│└─]*invariant-fail: x1\b/);
+      expect(result.paths).toEqual([expect.stringMatching(/^\d+(:\d+)*$/)]);
+      expect(result.logs.split("\n")).toContain(
+        `Counterexample path : ${result.paths[0]}`,
+      );
     },
   );
 
@@ -283,7 +291,7 @@ describe("Invariant testing outcomes", () => {
       expect(result.logs).not.toContain("Counterexample");
       expect(result.logs).not.toContain("invariant-pass: x");
       expect(result.logs).not.toContain("OK, invariants passed");
-      expect(result.persisted).toBe(0);
+      expect(result.paths).toHaveLength(0);
       expect(result.exitCode).toBe(1);
     }
   });
@@ -325,7 +333,7 @@ describe("Invariant testing outcomes", () => {
       "Warning: inconclusive after 20 runs: every public call threw.",
     );
     expect(result.logs).not.toContain("OK, invariants passed");
-    expect(result.persisted).toBe(0);
+    expect(result.paths).toHaveLength(0);
   });
 
   it.each([
@@ -348,6 +356,6 @@ describe("Invariant testing outcomes", () => {
     expect(result.exitCode).toBe(0);
     expect(result.logs).toContain("OK, invariants passed after 20 runs.");
     expect(result.logs).not.toContain("Warning:");
-    expect(result.persisted).toBe(0);
+    expect(result.paths).toHaveLength(0);
   });
 });

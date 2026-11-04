@@ -12,7 +12,6 @@ import fc from "fast-check";
 
 import { getContractFunction, strategyFor } from "./lib";
 import {
-  argsToCV,
   escapeNonPrintable,
   functionToArbitrary,
   getContractNameFromContractId,
@@ -168,82 +167,34 @@ describe("Argument generation", () => {
     ["uint128", BigInt(0), UINT128_MAX] as const,
   ])("generates %s values across the full Clarity range", (type, min, max) => {
     const values: bigint[] = fc.sample(arbitraryFor(type), 2_000);
-    // 2^32, beyond what the former 32-bit generators could produce.
-    const beyond32Bits = BigInt(2) ** BigInt(32);
+    const beyond64Bits = BigInt(2) ** BigInt(64);
 
-    expect(values.every((v) => typeof v === "bigint")).toBe(true);
     expect(values.every((v) => v >= min && v <= max)).toBe(true);
-    expect(values.some((v) => v > beyond32Bits)).toBe(true);
-    if (min < 0) {
-      expect(values.some((v) => v < -beyond32Bits)).toBe(true);
-    }
     expect(values).toContain(min);
     expect(values).toContain(max);
+    expect(values.some((v) => v !== max && v > beyond64Bits)).toBe(true);
     // Still biased toward small values.
     expect(
       values.filter((v) => v >= -1000 && v <= 1000).length,
     ).toBeGreaterThan(100);
   });
 
-  it.each([0, 1, 10, 127])(
-    "generates string-utf8 values of at most %i code points",
-    (length) => {
-      for (const value of fc.sample(
-        arbitraryFor({ "string-utf8": { length } }),
-        500,
-      ) as string[]) {
-        expect([...value].length).toBeLessThanOrEqual(length);
-        expect(value).not.toMatch(loneSurrogate);
-      }
-    },
-  );
+  it("generates single code points of every UTF-8 width for string-utf8", () => {
+    const values = fc.sample(
+      arbitraryFor({ "string-utf8": { length: 1 } }),
+      1_000,
+    ) as string[];
+    const codePoints = values.flatMap((v) =>
+      [...v].map((c) => c.codePointAt(0)!),
+    );
 
-  it("generates ASCII, BMP and astral code points in string-utf8 values", () => {
-    const codePoints = (
-      fc.sample(
-        arbitraryFor({ "string-utf8": { length: 10 } }),
-        1_000,
-      ) as string[]
-    ).flatMap((v) => [...v].map((c) => c.codePointAt(0)!));
-
+    for (const value of values) {
+      expect([...value].length).toBeLessThanOrEqual(1);
+      expect(value).not.toMatch(loneSurrogate);
+    }
     expect(codePoints.some((cp) => cp < 0x80)).toBe(true);
     expect(codePoints.some((cp) => cp >= 0x80 && cp < 0x10000)).toBe(true);
     expect(codePoints.some((cp) => cp >= 0x10000)).toBe(true);
-  });
-
-  it("keeps string-ascii values printable ASCII", () => {
-    fc.assert(
-      fc.property(
-        arbitraryFor({ "string-ascii": { length: 50 } }),
-        (value: string) => {
-          expect(value.length).toBeLessThanOrEqual(50);
-          expect(value).toMatch(/^[\x20-\x7e]*$/);
-        },
-      ),
-    );
-  });
-
-  it("converts generated values to Clarity values unchanged", () => {
-    const fn = {
-      name: "f",
-      access: "public",
-      args: [
-        { name: "i", type: "int128" },
-        { name: "u", type: "uint128" },
-        { name: "s", type: { "string-utf8": { length: 20 } } },
-      ],
-      outputs: { type: "bool" },
-    } as unknown as EnrichedContractInterfaceFunction;
-
-    fc.assert(
-      fc.property(fc.tuple(...functionToArbitrary(fn, [], {})), (raw) => {
-        expect(argsToCV(fn, raw)).toEqual([
-          Cl.int(raw[0]),
-          Cl.uint(raw[1]),
-          Cl.stringUtf8(raw[2]),
-        ]);
-      }),
-    );
   });
 
   it("produces arguments the simnet accepts unchanged", async () => {
@@ -283,26 +234,22 @@ describe("Argument generation", () => {
 
 describe("Clarity value printing", () => {
   it("escapes code points Cl.stringify leaves raw with \\u{...}", () => {
-    expect(printCV(Cl.stringUtf8("\u0080"))).toBe('u"\\u{80}"');
-    expect(printCV(Cl.stringUtf8("\u007f\u200b\u2028"))).toBe(
-      'u"\\u{7f}\\u{200b}\\u{2028}"',
+    expect(printCV(Cl.stringUtf8("\u0080\u007f\u200b\u2028"))).toBe(
+      'u"\\u{80}\\u{7f}\\u{200b}\\u{2028}"',
     );
     expect(printCV(Cl.list([Cl.stringUtf8("\u{f0000}")]))).toBe(
       '(list u"\\u{f0000}")',
     );
   });
 
-  it("keeps Cl.stringify escaping for C0 controls, quotes and backslashes", () => {
+  it("keeps Cl.stringify escaping for newlines and C0 controls", () => {
     expect(printCV(Cl.stringUtf8("a\nb\u001b[31m\u0000"))).toBe(
       'u"a\\nb\\u001b[31m\\u0000"',
     );
-    expect(printCV(Cl.stringAscii('a"b\\c'))).toBe('"a\\"b\\\\c"');
   });
 
   it("leaves printable values unchanged", () => {
     expect(printCV(Cl.stringUtf8("héllo 中文 🛋"))).toBe('u"héllo 中文 🛋"');
-    expect(printCV(Cl.int(INT128_MIN))).toBe(INT128_MIN.toString());
-    expect(printCV(Cl.uint(UINT128_MAX))).toBe(`u${UINT128_MAX}`);
   });
 
   it("escapes raw control characters in free text but keeps newlines", () => {

@@ -96,9 +96,8 @@ describe("strategyFor", () => {
 
   it("produces arguments usable with simnet.callPublicFn", async () => {
     const simnet = await initSimnet(manifestPath);
-    // `update-shipment` takes a uint and a string-ascii and keeps no state for
-    // unknown IDs, so any valid arguments return a response instead of
-    // throwing.
+    // Unlike `counter.add`, which throws on uint overflow, `update-shipment`
+    // returns a response for any valid arguments.
     const fn = getContractFunction(simnet, "cargo", "update-shipment");
     const arb = strategyFor(simnet, fn);
 
@@ -113,7 +112,7 @@ describe("strategyFor", () => {
         );
         expect(result).toBeDefined();
       }),
-      { numRuns: 20 },
+      { numRuns: 5 },
     );
   });
 

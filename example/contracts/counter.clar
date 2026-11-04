@@ -81,15 +81,15 @@
 ;; This test catches the bug in the counter contract.
 (define-private (test-increment)
   (let ((counter-before (get-counter)))
-    (if (is-eq counter-before MAX_UINT)
-      ;; Discard: incrementing the maximum uint would overflow.
-      (ok false)
+    (ok (if (is-eq counter-before MAX_UINT)
+      ;; Discard the test if incrementing the counter would overflow it.
+      false
       (begin
         (unwrap-panic (increment))
         (asserts! (is-eq (get-counter) (+ counter-before u1)) (err u404))
-        (ok true)
+        true
       )
-    )
+    ))
   )
 )
 

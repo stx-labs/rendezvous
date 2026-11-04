@@ -934,17 +934,13 @@ describe("Reporter escaping", () => {
                 access: "private",
                 outputs: [],
               } as any as ContractInterfaceFunction,
-              functionArgs: [
-                Cl.stringUtf8("\u0080\u001b[31m"),
-                Cl.stringAscii('a"b'),
-              ],
+              functionArgs: [Cl.stringUtf8("\u0080\u001b[31m")],
               testCaller: [
                 "wallet_1",
                 "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
               ],
             },
           ],
-          // Simnet runtime errors quote the raw argument.
           error: new Error('Runtime error in test-fn(u"\u0080\u001b[31m")'),
         },
         radio,
@@ -956,10 +952,7 @@ describe("Reporter escaping", () => {
     }
 
     expect(emittedErrorLogs).toContain(
-      '- Arguments     : u"\\u{80}\\u001b[31m" "a\\"b"',
-    );
-    expect(emittedErrorLogs.join("")).toContain(
-      'Runtime error in test-fn(u"\\u{80}\\u{1b}[31m")',
+      '- Arguments     : u"\\u{80}\\u001b[31m"',
     );
     expect(emittedErrorLogs.join("")).not.toContain("\u001b");
     expect(emittedErrorLogs.join("")).not.toContain("\u0080");

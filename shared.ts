@@ -169,9 +169,8 @@ export const INT128_MAX = BigInt(2) ** BigInt(127) - BigInt(1);
 export const UINT128_MAX = BigInt(2) ** BigInt(128) - BigInt(1);
 
 /**
- * A `bigint` in `[min, max]`. fast-check's `bigInt` already favours small
- * values and values near the bounds, but rarely hits the exact bounds, so they
- * are also drawn directly about 5% of the time.
+ * A `bigint` in `[min, max]`. `fc.bigInt` rarely hits the exact bounds, so
+ * they are also drawn directly 1 time in 20.
  */
 const fullRangeBigInt = (min: bigint, max: bigint): fc.Arbitrary<bigint> =>
   fc.oneof(
@@ -306,7 +305,6 @@ export const hexaString = (
 const charSet =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
-/** A single printable ASCII character. */
 const asciiChar = fc.constantFrom(...charSet);
 
 /**

@@ -96,21 +96,24 @@ describe("strategyFor", () => {
 
   it("produces arguments usable with simnet.callPublicFn", async () => {
     const simnet = await initSimnet(manifestPath);
-    const fn = getContractFunction(simnet, "counter", "add");
+    // `update-shipment` takes a uint and a string-ascii and keeps no state for
+    // unknown IDs, so any valid arguments return a response instead of
+    // throwing.
+    const fn = getContractFunction(simnet, "cargo", "update-shipment");
     const arb = strategyFor(simnet, fn);
 
     fc.assert(
       fc.property(arb, (args: ClarityValue[]) => {
         // Should not throw — arguments are valid Clarity values.
         const { result } = simnet.callPublicFn(
-          `${simnet.deployer}.counter`,
-          "add",
+          `${simnet.deployer}.cargo`,
+          "update-shipment",
           args,
           simnet.deployer,
         );
         expect(result).toBeDefined();
       }),
-      { numRuns: 5 },
+      { numRuns: 20 },
     );
   });
 

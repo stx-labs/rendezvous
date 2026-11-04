@@ -4,13 +4,13 @@ import { join, resolve } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
-import { Cl, cvToString, type ClarityValue } from "@stacks/transactions";
+import { Cl, type ClarityValue } from "@stacks/transactions";
 import fc from "fast-check";
 
 import { reporter, trackFailureStatistics } from "./heatstroke";
 import { FalsifiedInvariantError } from "./invariant";
 import { PropertyTestError } from "./property";
-import { getContractNameFromContractId } from "./shared";
+import { getContractNameFromContractId, printCV } from "./shared";
 import { createIsolatedTestEnvironment } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-heatstroke-";
@@ -169,7 +169,7 @@ describe("Custom reporter logging", () => {
                 .join(", ")})`,
               `- Arguments: ${r.selectedFunctionsArgsList
                 .map((selectedFunctionArgs) =>
-                  selectedFunctionArgs.map((cv) => cvToString(cv)).join(" "),
+                  selectedFunctionArgs.map(printCV).join(" "),
                 )
                 .join(", ")}`,
               `- Callers  : ${r.sutCallers
@@ -181,9 +181,7 @@ describe("Custom reporter logging", () => {
                 )
                 .join(", ")}`,
               `- Invariant: ${r.selectedInvariant.name} (${r.selectedInvariant.access})`,
-              `- Arguments: ${r.invariantArgs
-                .map((cv) => cvToString(cv))
-                .join(" ")}`,
+              `- Arguments: ${r.invariantArgs.map(printCV).join(" ")}`,
               `- Caller   : ${r.invariantCaller[0]}`,
               `\nWhat happened? Rendezvous went on a rampage and found a weak spot:\n`,
               `The invariant "${
@@ -332,7 +330,7 @@ describe("Custom reporter logging", () => {
                 .join(", ")})`,
               `- Arguments: ${r.selectedFunctionsArgsList
                 .map((selectedFunctionArgs) =>
-                  selectedFunctionArgs.map((cv) => cvToString(cv)).join(" "),
+                  selectedFunctionArgs.map(printCV).join(" "),
                 )
                 .join(", ")}`,
               `- Callers  : ${r.sutCallers
@@ -344,9 +342,7 @@ describe("Custom reporter logging", () => {
                 )
                 .join(", ")}`,
               `- Invariant: ${r.selectedInvariant.name} (${r.selectedInvariant.access})`,
-              `- Arguments: ${r.invariantArgs
-                .map((cv) => cvToString(cv))
-                .join(" ")}`,
+              `- Arguments: ${r.invariantArgs.map(printCV).join(" ")}`,
               `- Caller   : ${r.invariantCaller[0]}`,
               `\nWhat happened? Rendezvous went on a rampage and found a weak spot:\n`,
               `The invariant "${
@@ -570,9 +566,7 @@ describe("Custom reporter logging", () => {
                 rendezvousContractId,
               )}`,
               `- Test Function : ${r.selectedTestFunction.name} (${r.selectedTestFunction.access})`,
-              `- Arguments     : ${r.functionArgs
-                .map((cv) => cvToString(cv))
-                .join(" ")}`,
+              `- Arguments     : ${r.functionArgs.map(printCV).join(" ")}`,
               `- Caller        : ${r.testCaller[0]}`,
               `- Outputs       : ${JSON.stringify(
                 r.selectedTestFunction.outputs,
@@ -685,9 +679,7 @@ describe("Custom reporter logging", () => {
                 rendezvousContractId,
               )}`,
               `- Test Function : ${r.selectedTestFunction.name} (${r.selectedTestFunction.access})`,
-              `- Arguments     : ${r.functionArgs
-                .map((cv) => cvToString(cv))
-                .join(" ")}`,
+              `- Arguments     : ${r.functionArgs.map(printCV).join(" ")}`,
               `- Caller        : ${r.testCaller[0]}`,
               `- Outputs       : ${JSON.stringify(
                 r.selectedTestFunction.outputs,
@@ -917,5 +909,59 @@ describe("Failure statistics tracking", () => {
     ).rejects.toThrow();
     expect(statistics.test.failed.get("test-a")).toBeGreaterThan(1);
     expect(tracked.get().test!.failed.get("test-a")).toBe(1);
+  });
+});
+
+describe("Reporter escaping", () => {
+  it("escapes non-printable characters in arguments and runtime errors", () => {
+    const originalExitCode = process.exitCode;
+    const emittedErrorLogs: string[] = [];
+    const radio = new EventEmitter();
+    radio.on("logFailure", (message: string) => emittedErrorLogs.push(message));
+
+    try {
+      reporter(
+        {
+          failed: true,
+          numRuns: 1,
+          seed: 1,
+          counterexample: [
+            {
+              rendezvousContractId:
+                "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.contract",
+              selectedTestFunction: {
+                name: "test-fn",
+                access: "private",
+                outputs: [],
+              } as any as ContractInterfaceFunction,
+              functionArgs: [
+                Cl.stringUtf8("\u0080\u001b[31m"),
+                Cl.stringAscii('a"b'),
+              ],
+              testCaller: [
+                "wallet_1",
+                "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+              ],
+            },
+          ],
+          // Simnet runtime errors quote the raw argument.
+          error: new Error('Runtime error in test-fn(u"\u0080\u001b[31m")'),
+        },
+        radio,
+        "test",
+        {},
+      );
+    } finally {
+      process.exitCode = originalExitCode;
+    }
+
+    expect(emittedErrorLogs).toContain(
+      '- Arguments     : u"\\u{80}\\u001b[31m" "a\\"b"',
+    );
+    expect(emittedErrorLogs.join("")).toContain(
+      'Runtime error in test-fn(u"\\u{80}\\u{1b}[31m")',
+    );
+    expect(emittedErrorLogs.join("")).not.toContain("\u001b");
+    expect(emittedErrorLogs.join("")).not.toContain("\u0080");
   });
 });

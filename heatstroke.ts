@@ -1,7 +1,7 @@
 import type { EventEmitter } from "node:events";
 
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
-import { cvToString, type ClarityValue } from "@stacks/transactions";
+import type { ClarityValue } from "@stacks/transactions";
 import { green } from "ansicolor";
 import fc from "fast-check";
 
@@ -14,7 +14,11 @@ import type {
 } from "./heatstroke.types";
 import type { FalsifiedInvariantError } from "./invariant";
 import type { PropertyTestError } from "./property";
-import { getContractNameFromContractId } from "./shared";
+import {
+  escapeNonPrintable,
+  getContractNameFromContractId,
+  printCV,
+} from "./shared";
 
 /**
  * Heatstrokes Reporter
@@ -47,11 +51,13 @@ export const reporter = (
     const error = runDetails.errorInstance || runDetails.error;
 
     // Extract the actual Clarity error once for both error types.
-    const clarityError =
+    // Runtime errors quote the raw arguments, so escape them before logging.
+    const clarityError = escapeNonPrintable(
       (error as FalsifiedInvariantError | PropertyTestError)?.clarityError ||
-      error?.message ||
-      error?.toString() ||
-      "Unknown error";
+        error?.message ||
+        error?.toString() ||
+        "Unknown error",
+    );
 
     // Report general run data.
     radio.emit(
@@ -91,7 +97,7 @@ export const reporter = (
           "logFailure",
           `- Arguments: ${ce.selectedFunctionsArgsList
             .map((selectedFunctionArgs: ClarityValue[]) =>
-              selectedFunctionArgs.map((cv) => cvToString(cv)).join(" "),
+              selectedFunctionArgs.map(printCV).join(" "),
             )
             .join(", ")}`,
         );
@@ -116,7 +122,7 @@ export const reporter = (
         radio.emit(
           "logFailure",
           `- Arguments: ${(ce.invariantArgs as ClarityValue[])
-            .map((cv) => cvToString(cv))
+            .map(printCV)
             .join(" ")}`,
         );
         radio.emit("logFailure", `- Caller   : ${ce.invariantCaller[0]}`);
@@ -156,7 +162,7 @@ export const reporter = (
         radio.emit(
           "logFailure",
           `- Arguments     : ${(ce.functionArgs as ClarityValue[])
-            .map((cv) => cvToString(cv))
+            .map(printCV)
             .join(" ")}`,
         );
         radio.emit("logFailure", `- Caller        : ${ce.testCaller[0]}`);

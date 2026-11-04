@@ -3,11 +3,7 @@ import { resolve } from "node:path";
 
 import type { Simnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
-import {
-  ClarityType,
-  cvToString,
-  type ClarityValue,
-} from "@stacks/transactions";
+import { ClarityType, type ClarityValue } from "@stacks/transactions";
 import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
@@ -24,6 +20,7 @@ import {
   getContractNameFromContractId,
   getFunctionsListForContract,
   LOG_DIVIDER,
+  printCV,
 } from "./shared";
 import {
   buildTraitReferenceMap,
@@ -394,9 +391,7 @@ const propertyTest = async (
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
       failureStatistics.track(async (r) => {
-        const printedTestFunctionArgs = r.functionArgs
-          .map((cv) => cvToString(cv))
-          .join(" ");
+        const printedTestFunctionArgs = r.functionArgs.map(printCV).join(" ");
 
         const [testCallerWallet, testCallerAddress] = r.testCaller;
 
@@ -442,7 +437,7 @@ const propertyTest = async (
               testFunctionCallResult,
             );
 
-            const testFunctionCallClarityResult = cvToString(
+            const testFunctionCallClarityResult = printCV(
               testFunctionCallResult,
             );
 

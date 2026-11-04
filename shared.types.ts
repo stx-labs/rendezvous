@@ -50,8 +50,8 @@ export type TupleData<T extends ClarityValue = ClarityValue> = Record<
 >;
 
 export interface BaseTypesToCV {
-  int128: (arg: number) => ReturnType<typeof intCV>;
-  uint128: (arg: number) => ReturnType<typeof uintCV>;
+  int128: (arg: bigint) => ReturnType<typeof intCV>;
+  uint128: (arg: bigint) => ReturnType<typeof uintCV>;
   bool: (arg: boolean) => ReturnType<typeof boolCV>;
   principal: (arg: string) => ReturnType<typeof principalCV>;
 }
@@ -115,8 +115,8 @@ export type ParameterType = BaseType | ComplexType;
 export type EnrichedParameterType = EnrichedBaseType | EnrichedComplexType;
 
 export interface BaseTypesToArbitrary {
-  int128: ReturnType<typeof fc.integer>;
-  uint128: ReturnType<typeof fc.nat>;
+  int128: fc.Arbitrary<bigint>;
+  uint128: fc.Arbitrary<bigint>;
   bool: ReturnType<typeof fc.boolean>;
   principal: (addresses: string[]) => ReturnType<typeof fc.constantFrom>;
 }

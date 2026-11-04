@@ -291,6 +291,8 @@ rv root contract test --regr
 
 Rendezvous will load all saved failures for the contract and replay them using their original seeds. This ensures that fixed bugs stay fixed.
 
+A seed reproduces a run only with the same Rendezvous version. If an upgrade changes how arguments are generated, the same seed produces different arguments, so regressions saved by an older version no longer replay the original failing inputs.
+
 **How Failure Persistence Works**
 
 When Rendezvous detects a failure, it automatically saves the test configuration to:

@@ -283,36 +283,20 @@ describe("CLI parsing with parseCli", () => {
   });
 
   it("takes snapshot only from the config when --config is provided", () => {
-    // Arrange
-    const tempDir = join(tmpdir(), "rendezvous-test-parsecli-snapshot");
-    mkdirSync(tempDir, { recursive: true });
+    const tempDir = mkdtempSync(join(tmpdir(), "rv-cli-snapshot-"));
     const configPath = join(tempDir, "rv.config.json");
-    writeFileSync(configPath, JSON.stringify({ snapshot: true }), "utf-8");
-
-    // Act
-    const fromConfig = parseCli([
-      "./example",
-      "counter",
-      "test",
-      `--config=${configPath}`,
-    ])!;
-    writeFileSync(configPath, JSON.stringify({}), "utf-8");
-    const ignored = parseCli([
-      "./example",
-      "counter",
-      "test",
-      `--config=${configPath}`,
-      "--snapshot",
-    ])!;
-
-    // Assert
-    expect(fromConfig.snapshot).toBe(true);
-    expect(ignored.snapshot).toBe(false);
-    expect(ignored.warnings).toEqual([
-      "Warning: --snapshot ignored when --config is used.",
-    ]);
-
-    // Teardown
-    rmSync(tempDir, { recursive: true, force: true });
+    const argv = ["./example", "counter", "test", `--config=${configPath}`];
+    try {
+      writeFileSync(configPath, JSON.stringify({ snapshot: true }));
+      expect(parseCli(argv)!.snapshot).toBe(true);
+      writeFileSync(configPath, "{}");
+      const ignored = parseCli([...argv, "--snapshot"])!;
+      expect(ignored.snapshot).toBe(false);
+      expect(ignored.warnings).toEqual([
+        "Warning: --snapshot ignored when --config is used.",
+      ]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

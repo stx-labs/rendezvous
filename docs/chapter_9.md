@@ -110,8 +110,8 @@ const arb = strategyFor(simnet, mint, [wallet1]);
 
 | Clarity Type      | Generated As                                     |
 | ----------------- | ------------------------------------------------ |
-| `uint`            | `bigint` across 0 to 2^128 - 1                   |
-| `int`             | `bigint` across -2^127 to 2^127 - 1              |
+| `uint`            | Full range, 0 to 2^128 - 1                       |
+| `int`             | Full range, -2^127 to 2^127 - 1                  |
 | `bool`            | Booleans                                         |
 | `principal`       | Random address from simnet accounts              |
 | `buff`            | Hex-encoded buffers (respects max length)        |

@@ -173,13 +173,16 @@ describe("Argument generation", () => {
     expect(values).toContain(min);
     expect(values).toContain(max);
     expect(values.some((v) => v !== max && v > beyond64Bits)).toBe(true);
+    if (min < 0) {
+      expect(values.some((v) => v !== min && v < -beyond64Bits)).toBe(true);
+    }
     // Still biased toward small values.
     expect(
       values.filter((v) => v >= -1000 && v <= 1000).length,
     ).toBeGreaterThan(100);
   });
 
-  it("generates single code points of every UTF-8 width for string-utf8", () => {
+  it("generates single ASCII, BMP and astral code points for string-utf8", () => {
     const values = fc.sample(
       arbitraryFor({ "string-utf8": { length: 1 } }),
       1_000,

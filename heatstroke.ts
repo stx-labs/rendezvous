@@ -60,7 +60,7 @@ export const reporter = (
     );
     radio.emit("logFailure", `Seed : ${seed}`);
     if (counterexamplePath) {
-      radio.emit("logFailure", `Path : ${counterexamplePath}`);
+      radio.emit("logFailure", `Counterexample path : ${counterexamplePath}`);
     }
     switch (type) {
       case "invariant": {

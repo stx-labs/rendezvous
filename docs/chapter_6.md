@@ -164,7 +164,7 @@ When Rendezvous detects an issue, it includes the seed needed to reproduce the t
 ```
 Error: Property failed after 2 tests.
 Seed : 426141810
-Path : 1:0
+Counterexample path : 1:0
 
 Counterexample:
 ...
@@ -179,7 +179,7 @@ In this case, the seed is `426141810`. You can use it to rerun the exact same te
 rv root contract test --seed=426141810
 ```
 
-The `Path` line is fast-check's path to the counterexample, shown for diagnostics. Rendezvous has no option to replay a path: the seed reproduces the run, with at least as many `--runs` and the same `--dial`.
+The `Counterexample path` line is fast-check's path to the counterexample, shown for diagnostics. Rendezvous has no option to replay a path: the seed reproduces the run, with at least as many `--runs` and the same `--dial`.
 
 **3. Stop After First Failure**
 

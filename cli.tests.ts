@@ -96,6 +96,7 @@ describe("CLI parsing with parseCli", () => {
   it("uses config file values exclusively when --config is provided, ignoring CLI flags", () => {
     // Arrange
     const tempDir = mkdtempSync(join(tmpdir(), "rendezvous-test-parsecli-"));
+    onTestFinished(() => rmSync(tempDir, { recursive: true, force: true }));
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(
       configPath,
@@ -117,9 +118,6 @@ describe("CLI parsing with parseCli", () => {
     expect(config.seed).toBe(100);
     expect(config.runs).toBe(500);
     expect(config.bail).toBe(true);
-
-    // Teardown
-    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("uses CLI flags exclusively when --config is not provided", () => {
@@ -143,6 +141,7 @@ describe("CLI parsing with parseCli", () => {
     const tempDir = mkdtempSync(
       join(tmpdir(), "rendezvous-test-parsecli-accounts-"),
     );
+    onTestFinished(() => rmSync(tempDir, { recursive: true, force: true }));
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(
       configPath,
@@ -174,9 +173,6 @@ describe("CLI parsing with parseCli", () => {
       },
     ]);
     expect(config.accountsMode).toBe("overwrite");
-
-    // Teardown
-    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("throws when config file does not exist", () => {
@@ -218,6 +214,7 @@ describe("CLI parsing with parseCli", () => {
     const tempDir = mkdtempSync(
       join(tmpdir(), "rendezvous-test-parsecli-warn-flags-"),
     );
+    onTestFinished(() => rmSync(tempDir, { recursive: true, force: true }));
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(configPath, JSON.stringify({ seed: 1 }), "utf-8");
 
@@ -238,9 +235,6 @@ describe("CLI parsing with parseCli", () => {
         expect.stringContaining("--bail"),
       ]),
     );
-
-    // Teardown
-    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("warns when config file contains unrecognized keys", () => {
@@ -248,6 +242,7 @@ describe("CLI parsing with parseCli", () => {
     const tempDir = mkdtempSync(
       join(tmpdir(), "rendezvous-test-parsecli-warn-keys-"),
     );
+    onTestFinished(() => rmSync(tempDir, { recursive: true, force: true }));
     const configPath = join(tempDir, "rv.config.json");
     writeFileSync(
       configPath,
@@ -267,9 +262,6 @@ describe("CLI parsing with parseCli", () => {
     expect(config.warnings).toEqual(
       expect.arrayContaining([expect.stringContaining("sedd")]),
     );
-
-    // Teardown
-    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("returns no warnings for valid CLI-only usage", () => {

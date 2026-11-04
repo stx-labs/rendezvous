@@ -407,17 +407,22 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 Use `rv root contract invariant --snapshot` (`"snapshot": true` in config) to
 reset simnet and replay the captured seed up to the first failing run.
 Snapshots show the target contract's `define-data-var` values and block
-heights before calls. Property tests record the failing test call;
-invariant tests record each public call and the invariant check.
+heights before calls. Property tests record the failing test call, or a
+discard function that throws; invariant tests record each public call and the
+invariant check.
 
 Passing runs are not replayed. Maps, constants, token balances, and other
 contracts are excluded. Snapshots describe the first failure before
 shrinking; use `--bail` to keep the ordinary failure report on that run.
-If replay passes or fails at a different run, no state is shown.
+If replay passes or fails at a different run, no state is shown. A failure
+before any recorded contract call also has no state to show.
 
-Dialers must be deterministic; equal failure run numbers do not prove
-identical execution. Snapshot errors remain secondary to the original
-failure. Replay does not save another failure.
+Dialers must be deterministic and must not depend on mutable module state;
+replay invokes them again without resetting that state. Equal failure run
+numbers do not prove identical execution. For regression tests, snapshots
+are replayed after all regressions so replay cannot affect later regressions.
+Snapshot errors remain secondary to the original failure. Replay does not save
+another failure.
 
 ### Summary
 

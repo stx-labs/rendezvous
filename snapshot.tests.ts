@@ -170,6 +170,21 @@ describe("Reporting the state before a failure", () => {
     },
   );
 
+  it("reports when the failure happens before a recorded contract call", async () => {
+    const { logs, radio } = captureLogs();
+    await reportStateBeforeFailure(
+      failedRun(1),
+      "ST1.contract",
+      async () => {},
+      async () => failedRun(1),
+      radio,
+    );
+    expect(logs).toContain(
+      "No contract call was recorded during the failing run, so no state is reported.\n",
+    );
+    expect(logs.join("\n")).not.toContain("Contract state before");
+  });
+
   it("reports a read error instead of the state", async () => {
     // Arrange
     const { logs, radio } = captureLogs();
@@ -335,6 +350,21 @@ epoch = 3.0
     expect(regressions.test).toHaveLength(1);
   });
 
+  it("reports state when a discard function throws", async () => {
+    writeFileSync(
+      join(project, "contracts", "counter.clar"),
+      `(define-data-var counter uint u7)
+(define-read-only (can-test-example) (is-eq (/ u1 u0) u1))
+(define-private (test-example) (ok true))
+`,
+    );
+
+    const output = await run(["test", "--seed=1", "--bail", "--snapshot"]);
+
+    expect(output).toMatch(/before can-test-example\n {2}counter: u7/);
+    expect(process.exitCode).toBe(1);
+  });
+
   it("reports state before calls in the failing invariant run", async () => {
     // Act
     const output = await run(["invariant", "--seed=1", "--snapshot"]);
@@ -356,6 +386,48 @@ epoch = 3.0
       expect(counter).toBe(states[0].counter + index);
     });
     expect(states[states.length - 1].counter).toBeGreaterThanOrEqual(5);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("runs all invariant regressions before replaying snapshots", async () => {
+    const directory = join(project, ".rendezvous-regressions");
+    mkdirSync(directory);
+    writeFileSync(
+      join(directory, "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter.json"),
+      JSON.stringify({
+        invariant: [
+          { seed: 1, numRuns: 10, timestamp: 2 },
+          { seed: 2, numRuns: 10, timestamp: 1 },
+        ],
+      }),
+    );
+
+    const output = await run(["invariant", "--regr", "--snapshot"]);
+
+    const firstReplay = output.indexOf("Replaying seed");
+    expect(firstReplay).toBeGreaterThan(0);
+    expect(
+      output.slice(0, firstReplay).match(/Error: Property failed/g),
+    ).toHaveLength(2);
+    expect(output.slice(firstReplay).match(/Replaying seed/g)).toHaveLength(2);
+  });
+
+  it("does not replay an invariant context update error", async () => {
+    writeFileSync(
+      join(project, "contracts", "counter.clar"),
+      `(define-data-var counter uint u0)
+(define-private (update-context (name (string-ascii 100)) (called uint))
+  (if (is-eq called u0) (ok true) (err u1)))
+(define-public (increment) (ok (var-set counter (+ (var-get counter) u1))))
+(define-read-only (invariant-passes) true)
+`,
+    );
+
+    const output = await run(["invariant", "--seed=1", "--snapshot"]);
+
+    expect(output).toContain("Could not update the context");
+    expect(output).not.toContain("Replaying seed");
+    expect(output).not.toContain("Contract state before");
     expect(process.exitCode).toBe(1);
   });
 

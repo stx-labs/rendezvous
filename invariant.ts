@@ -216,25 +216,33 @@ export const checkInvariants = async (
    * Runs an invariant test and, with `snapshot`, replays a failure to report
    * the contract state before it.
    */
+  const pendingSnapshots: (() => Promise<void>)[] = [];
   const runInvariantTest = async (
     config: InvariantTestConfig & InvariantTestContext,
   ) => {
     const runDetails = await invariantTest(config);
-    if (snapshot) {
-      await reportStateBeforeFailure(
-        runDetails,
-        rendezvousContractId,
-        resetSession,
-        (replayRadio, recorder) =>
-          invariantTest({
-            ...config,
-            seed: runDetails.seed,
-            bail: true,
-            radio: replayRadio,
-            recorder,
-          }),
-        radio,
-      );
+    if (snapshot && runDetails.failed) {
+      const reportSnapshot = () =>
+        reportStateBeforeFailure(
+          runDetails,
+          rendezvousContractId,
+          resetSession,
+          (replayRadio, recorder) =>
+            invariantTest({
+              ...config,
+              seed: runDetails.seed,
+              bail: true,
+              radio: replayRadio,
+              recorder,
+            }),
+          radio,
+        );
+      if (regr) {
+        // Replay can mutate dialer state, so finish all regression runs first.
+        pendingSnapshots.push(reportSnapshot);
+      } else {
+        await reportSnapshot();
+      }
     }
   };
 
@@ -292,6 +300,9 @@ export const checkInvariants = async (
         invariants,
         projectTraitImplementations,
       });
+    }
+    for (const reportSnapshot of pendingSnapshots) {
+      await reportSnapshot();
     }
   } else {
     // Run fresh invariant tests using user-provided configuration.
@@ -399,7 +410,7 @@ const invariantTest = async (
     statistics.invariant!.failed.set(functionInterface.name, 0);
   }
 
-  let result: RunDetails | undefined = undefined;
+  let runResult: RunDetails | undefined = undefined;
   const failureStatistics = trackFailureStatistics(statistics);
 
   // A failed context update is a harness error, not a counterexample. Once it
@@ -409,7 +420,7 @@ const invariantTest = async (
 
   const radioReporter = async (runDetails: any) => {
     if (contextUpdateError !== undefined) {
-      result = { ...runDetails, failed: false };
+      runResult = { ...runDetails, failed: false };
       radio.emit(
         "logFailure",
         `\nStopped the run: ${contextUpdateError.message}\n`,
@@ -418,7 +429,7 @@ const invariantTest = async (
       return;
     }
 
-    result = runDetails;
+    runResult = runDetails;
     reporter(runDetails, radio, "invariant", failureStatistics.get());
 
     // Persist failures for regression testing. A replay to record the
@@ -742,7 +753,7 @@ const invariantTest = async (
       verbose: false,
     },
   );
-  return result!;
+  return runResult!;
 };
 
 /**

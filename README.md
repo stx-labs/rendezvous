@@ -73,7 +73,8 @@ Use `rv example counter invariant --snapshot` to reset simnet and replay
 its captured seed up to the first failing run as it was before shrinking.
 It prints the target contract's data variables before each call. Passing
 runs do no extra replay. Maps, constants, token balances, and other
-contracts are excluded. Set `"snapshot": true` in config.
+contracts are excluded. Dialers must be deterministic and must not depend on
+mutable module state. Set `"snapshot": true` in config.
 
 ---
 

@@ -3,8 +3,8 @@ import type { EventEmitter } from "node:events";
 import type { Simnet } from "@stacks/clarinet-sdk";
 
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
-import type { ImplementedTraitType } from "./traits.types";
 import type { StateRecorder } from "./snapshot";
+import type { ImplementedTraitType } from "./traits.types";
 
 type ContractId = string;
 

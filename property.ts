@@ -440,13 +440,25 @@ const propertyTest = async (
           .get(r.selectedTestFunction.name);
 
         try {
-          const discarded = isTestDiscarded(
-            discardFunctionName,
-            r.functionArgs,
-            r.rendezvousContractId,
-            simnet,
-            testCallerAddress,
-          );
+          let discarded = false;
+          try {
+            discarded = isTestDiscarded(
+              discardFunctionName,
+              r.functionArgs,
+              r.rendezvousContractId,
+              simnet,
+              testCallerAddress,
+            );
+          } catch (error) {
+            if (discardFunctionName !== undefined) {
+              recorder?.record(
+                simnet,
+                r.rendezvousContractId,
+                discardFunctionName,
+              );
+            }
+            throw error;
+          }
 
           if (discarded) {
             incrementCount(

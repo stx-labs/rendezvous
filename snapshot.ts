@@ -123,6 +123,14 @@ export const reportStateBeforeFailure = async (
     return;
   }
 
+  if (recorder.snapshots.length === 0) {
+    radio.emit(
+      "logFailure",
+      "No contract call was recorded during the failing run, so no state is reported.\n",
+    );
+    return;
+  }
+
   const contractName = getContractNameFromContractId(contractId);
   radio.emit(
     "logMessage",

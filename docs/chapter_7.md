@@ -18,7 +18,7 @@ You’ll learn to:
 
 Before you begin, make sure you have:
 
-- Node.js (version >= 22.13.0)
+- Node.js (version >= 20)
 - Clarinet installed ([installation guide](https://github.com/stx-labs/clarinet))
 
 ## Step 1: Create a New Clarinet Project

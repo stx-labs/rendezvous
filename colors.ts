@@ -1,9 +1,8 @@
 import { styleText } from "node:util";
 
 /**
- * Styles text for the given stream (stdout by default). Colors are applied only
- * when that stream is a terminal, and follow `NO_COLOR`, `NODE_DISABLE_COLORS`
- * and `FORCE_COLOR`.
+ * Styles text for the given stream (stdout by default). Node colors it only if
+ * the stream is a terminal, unless `NO_COLOR` or `FORCE_COLOR` says otherwise.
  */
 const style =
   (format: Parameters<typeof styleText>[0]) =>

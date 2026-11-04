@@ -4,5 +4,12 @@
     "noEmit": false,
     "types": ["node"]
   },
-  "exclude": ["*.tests.*", "*.config.ts", "vitest.setup.ts", "dist", "example"]
+  "exclude": [
+    "*.tests.*",
+    "test.utils.ts",
+    "*.config.ts",
+    "vitest.setup.ts",
+    "dist",
+    "example"
+  ]
 }

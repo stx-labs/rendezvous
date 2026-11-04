@@ -210,8 +210,8 @@ importers:
         specifier: ^3.26.0
         version: 3.26.0
       '@stacks/rendezvous':
-        specifier: ^1.0.3
-        version: 1.0.3
+        specifier: ^1.1.0
+        version: 1.1.0
       '@stacks/transactions':
         specifier: ^7.6.0
         version: 7.6.0
@@ -562,8 +562,8 @@ packages:
   '@stacks/network@7.6.0':
     resolution: {integrity: sha512-Blm85nsEbvJoFIFaDp0QE9WMC0Hf+o3Yb0oIDwWu3PPgpVSdndb/bJQUeT6eJTs0ibS26A2E/5d5L0fb4Ff/lA==}
 
-  '@stacks/rendezvous@1.0.3':
-    resolution: {integrity: sha512-1QJsSNRG1RF27bejQ/ifQ5ExxmLoe1UIWbotj/rPRZpWvOhCWp1p4aZ1N+gMuNawNVkXLdWoLOSmGdqkTfuYUQ==}
+  '@stacks/rendezvous@1.1.0':
+    resolution: {integrity: sha512-kFo8X7iUumnjvrQ9cXLfCIGFTxHWYPCv5aIE9xd2zDq1BkPsC97wINIFzWeSINRnEnOxlFKNBJc+mZ0yGcJDig==}
     hasBin: true
 
   '@stacks/transactions@7.6.0':
@@ -1498,9 +1498,10 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@stacks/rendezvous@1.0.3':
+  '@stacks/rendezvous@1.1.0':
     dependencies:
       '@stacks/clarinet-sdk': 3.26.0
+      '@stacks/clarinet-sdk-wasm': 3.26.0
       '@stacks/transactions': 7.6.0
       ansicolor: 2.0.3
       fast-check: 4.10.2

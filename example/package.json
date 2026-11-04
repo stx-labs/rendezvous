@@ -13,7 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@stacks/clarinet-sdk": "^3.26.0",
-    "@stacks/rendezvous": "^1.0.3",
+    "@stacks/rendezvous": "^1.1.0",
     "@stacks/transactions": "^7.6.0",
     "@types/node": "^26.6.6",
     "chokidar-cli": "^3.0.0",

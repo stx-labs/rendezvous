@@ -27,7 +27,8 @@ import { getContractNameFromContractId } from "./shared";
  * @property `runDetails.counterexample`: The input that caused the failure.
  * @property `runDetails.numRuns`: The number of test cases that were run.
  * @property `runDetails.seed`: The replay seed for reproducing the failure.
- * @property `runDetails.path`: The replay path for reproducing the failure.
+ * @property `runDetails.counterexamplePath`: The fast-check path to the
+ * counterexample.
  * @property `runDetails.error`: The error thrown during the test.
  * @param radio The event emitter to log messages.
  * @param type The type of test that failed: invariant or property.
@@ -39,7 +40,8 @@ export const reporter = (
   type: "invariant" | "test",
   statistics: Statistics,
 ) => {
-  const { counterexample, failed, numRuns, path, seed } = runDetails;
+  const { counterexample, counterexamplePath, failed, numRuns, seed } =
+    runDetails;
 
   if (failed) {
     const error = runDetails.errorInstance || runDetails.error;
@@ -57,8 +59,8 @@ export const reporter = (
       `\nError: Property failed after ${numRuns} tests.`,
     );
     radio.emit("logFailure", `Seed : ${seed}`);
-    if (path) {
-      radio.emit("logFailure", `Path : ${path}`);
+    if (counterexamplePath) {
+      radio.emit("logFailure", `Counterexample path : ${counterexamplePath}`);
     }
     switch (type) {
       case "invariant": {

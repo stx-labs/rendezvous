@@ -22,6 +22,9 @@ async function postTransferSip010PrintEvent(context) {
     return;
   }
 
+  // Failed transfers roll back events and need no print-event check.
+  if (context.functionCall.result.type !== "ok") return;
+
   const functionCallEvents = context.functionCall.events;
 
   // The `memo` parameter is the fourth parameter of the `rendezvous-token`'s

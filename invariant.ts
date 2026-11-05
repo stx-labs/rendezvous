@@ -538,18 +538,6 @@ const invariantTest = async (
                 );
                 throw contextUpdateError;
               }
-
-              try {
-                if (dialerRegistry !== undefined) {
-                  await dialerRegistry.executePostDialers({
-                    selectedFunction,
-                    functionCall,
-                    clarityValueArguments: r.selectedFunctionsArgsList[index],
-                  });
-                }
-              } catch (error: any) {
-                throw new PostDialerError(error.message);
-              }
             } else {
               // Function call failed.
               incrementCount(statistics.sut!.failed, selectedFunction.name);
@@ -565,6 +553,18 @@ const invariantTest = async (
                     red(selectedFunctionClarityResult),
                 ),
               );
+            }
+
+            try {
+              if (dialerRegistry !== undefined) {
+                await dialerRegistry.executePostDialers({
+                  selectedFunction,
+                  functionCall,
+                  clarityValueArguments: r.selectedFunctionsArgsList[index],
+                });
+              }
+            } catch (error: any) {
+              throw new PostDialerError(error.message);
             }
           } catch (error: any) {
             if (

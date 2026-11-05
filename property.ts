@@ -4,9 +4,9 @@ import { resolve } from "node:path";
 import type { Simnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import { ClarityType, type ClarityValue } from "@stacks/transactions";
-import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
+import { dim, green, red, underline, yellow } from "./colors";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
 import { strategyFor } from "./lib";

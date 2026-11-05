@@ -2,9 +2,9 @@ import type { EventEmitter } from "node:events";
 
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import type { ClarityValue } from "@stacks/transactions";
-import { green } from "ansicolor";
 import fc from "fast-check";
 
+import { green } from "./colors";
 import type {
   InvariantCounterExample,
   RunDetails,

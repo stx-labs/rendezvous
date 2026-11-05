@@ -1,10 +1,13 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { loadConfig, resolveAccounts, type ConfigAccount } from "./config";
 
-const temporaryTestBaseDir = resolve(tmpdir(), "rendezvous-test-config");
+// Unique per run, so concurrent runs on the same machine don't collide.
+const temporaryTestBaseDir = mkdtempSync(
+  join(tmpdir(), "rendezvous-test-config-"),
+);
 
 const createTempConfigFile = (dirName: string, content: string): string => {
   const dir = join(temporaryTestBaseDir, dirName);

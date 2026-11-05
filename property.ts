@@ -704,18 +704,9 @@ const validateDiscardFunction = (
 export const isParamsMatch = (
   testFunctionInterface: ContractInterfaceFunction,
   discardFunctionInterface: ContractInterfaceFunction,
-) => {
-  const sortedTestFunctionArgs = [...testFunctionInterface.args].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
-  const sortedDiscardFunctionArgs = [...discardFunctionInterface.args].sort(
-    (a, b) => a.name.localeCompare(b.name),
-  );
-  return (
-    JSON.stringify(sortedTestFunctionArgs) ===
-    JSON.stringify(sortedDiscardFunctionArgs)
-  );
-};
+) =>
+  JSON.stringify(testFunctionInterface.args) ===
+  JSON.stringify(discardFunctionInterface.args);
 
 /**
  * Checks if the discard function's return type is boolean.

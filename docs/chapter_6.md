@@ -546,7 +546,7 @@ A **separate function** determines whether a test should run.
 >
 > - Must be **read-only**.
 > - Name must match the property test function, prefixed with `"can-"`.
-> - Parameters must **mirror** the property test’s parameters.
+> - Parameter names, types, and order must match the property test’s parameters.
 > - Must return `true` **only if inputs are valid**, allowing the test to run.
 
 **Discard function example**

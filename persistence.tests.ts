@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -11,7 +11,10 @@ import {
   persistFailure,
 } from "./persistence";
 
-const temporaryTestBaseDir = resolve(tmpdir(), "rendezvous-test-persistence");
+// Unique per run, so concurrent runs on the same machine don't collide.
+const temporaryTestBaseDir = mkdtempSync(
+  join(tmpdir(), "rendezvous-test-persistence-"),
+);
 
 const TEST_CONTRACT_ID = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter";
 

@@ -56,7 +56,8 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
 - `--seed` – The seed to use for the replay functionality.
 - `--runs` – The number of test iterations to use for exercising the contracts.
   (default: `100`)
-- `--coverage` – Report line and branch coverage (opt-in).
+- `--coverage` – Report line and branch coverage (opt-in); see the
+  [coverage reference](docs/chapter_6.md).
 - `--coverage-json` – Save coverage totals and a timed coverage curve.
 - `--coverage-lcov` – Save merged line and branch LCOV.
 - `--regr` – Run regression tests only (replay saved failures).
@@ -69,18 +70,6 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
   throws; these only warn by default.
 - `--dial` – The path to a JavaScript file containing custom pre- and
   post-execution functions (dialers).
-
----
-
-### Coverage (opt-in)
-
-```bash
-rv example counter invariant --runs=1000 --seed=42 --coverage \
-  --coverage-json=coverage.json --coverage-lcov=coverage.lcov
-```
-
-`--coverage` reports line and branch coverage of project sources; see the
-[coverage reference](docs/chapter_6.md) for scope and output details.
 
 ---
 

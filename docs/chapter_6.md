@@ -467,10 +467,6 @@ Rendezvous colors its output only when writing to a terminal, so redirected or p
 FORCE_COLOR=1 rv root contract test
 ```
 
-`--coverage` reports line and branch coverage. With it, use
-`--coverage-json=<file>` to save totals and a timed curve, or
-`--coverage-lcov=<file>` to save merged LCOV.
-
 ---
 
 ## Understanding Rendezvous

@@ -14,7 +14,7 @@ import fc from "fast-check";
 import { dim, green, red, underline, yellow } from "./colors";
 import { DialerRegistry, PostDialerError, PreDialerError } from "./dialer";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
-import type { Statistics } from "./heatstroke.types";
+import type { RunDetails, Statistics } from "./heatstroke.types";
 import type {
   InvariantTestConfig,
   InvariantTestContext,
@@ -32,6 +32,7 @@ import {
   LOG_DIVIDER,
 } from "./shared";
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
+import { reportStateBeforeFailure } from "./snapshot";
 import {
   buildTraitReferenceMap,
   enrichInterfaceWithTraitData,
@@ -57,6 +58,7 @@ import {
  * @param radio The custom logging event emitter.
  * @param eligibleAccounts The resolved eligible accounts map.
  * @param allAddresses All resolved addresses for principal type generation.
+ * @param snapshot Whether to report the contract state before a failure.
  * @returns void
  */
 export const checkInvariants = async (
@@ -72,6 +74,7 @@ export const checkInvariants = async (
   radio: EventEmitter,
   eligibleAccounts: Map<string, string>,
   allAddresses: string[],
+  snapshot = false,
 ) => {
   // The Rendezvous identifier is the first one in the list. Only one contract
   // can be fuzzed at a time.
@@ -209,6 +212,40 @@ export const checkInvariants = async (
     return;
   }
 
+  /**
+   * Runs an invariant test and, with `snapshot`, replays a failure to report
+   * the contract state before it.
+   */
+  const pendingSnapshots: (() => Promise<void>)[] = [];
+  const runInvariantTest = async (
+    config: InvariantTestConfig & InvariantTestContext,
+  ) => {
+    const runDetails = await invariantTest(config);
+    if (snapshot && runDetails.failed) {
+      const reportSnapshot = () =>
+        reportStateBeforeFailure(
+          runDetails,
+          rendezvousContractId,
+          resetSession,
+          (replayRadio, recorder) =>
+            invariantTest({
+              ...config,
+              seed: runDetails.seed,
+              bail: true,
+              radio: replayRadio,
+              recorder,
+            }),
+          radio,
+        );
+      if (regr) {
+        // Replay can mutate dialer state, so finish all regression runs first.
+        pendingSnapshots.push(reportSnapshot);
+      } else {
+        await reportSnapshot();
+      }
+    }
+  };
+
   if (regr) {
     // Run regression tests only.
     radio.emit(
@@ -248,7 +285,7 @@ export const checkInvariants = async (
 
       await resetSession();
 
-      await invariantTest({
+      await runInvariantTest({
         simnet,
         targetContractName,
         rendezvousContractId,
@@ -264,6 +301,9 @@ export const checkInvariants = async (
         projectTraitImplementations,
       });
     }
+    for (const reportSnapshot of pendingSnapshots) {
+      await reportSnapshot();
+    }
   } else {
     // Run fresh invariant tests using user-provided configuration.
     radio.emit(
@@ -271,7 +311,7 @@ export const checkInvariants = async (
       `Starting fresh round of invariant testing for the ${targetContractName} contract using user-provided configuration...\n`,
     );
 
-    await invariantTest({
+    await runInvariantTest({
       simnet,
       targetContractName,
       rendezvousContractId,
@@ -293,11 +333,12 @@ export const checkInvariants = async (
  * Runs an invariant test.
  * @param config The union of the configuration and context for the invariant
  * test.
- * @returns A promise that resolves when the invariant test is complete.
+ * @returns A promise that resolves to the run details when the invariant
+ * test is complete.
  */
 const invariantTest = async (
   config: InvariantTestConfig & InvariantTestContext,
-) => {
+): Promise<RunDetails> => {
   const {
     simnet,
     targetContractName,
@@ -312,6 +353,7 @@ const invariantTest = async (
     functions,
     invariants,
     projectTraitImplementations,
+    recorder,
   } = config;
 
   // Pre-build one fast-check arbitrary per SUT and invariant function via
@@ -368,7 +410,12 @@ const invariantTest = async (
     statistics.invariant!.failed.set(functionInterface.name, 0);
   }
 
-  const failureStatistics = trackFailureStatistics(statistics);
+  let runResult: RunDetails | undefined = undefined;
+  let failureFunction = "";
+  let firstFailure: RunDetails["firstFailure"] = undefined;
+  const failureStatistics = trackFailureStatistics(statistics, (error) => {
+    firstFailure = { functionName: failureFunction, message: String(error) };
+  });
 
   // A failed context update is a harness error, not a counterexample. Once it
   // happens, later cases are skipped so fast-check does not shrink it, and it
@@ -377,6 +424,7 @@ const invariantTest = async (
 
   const radioReporter = async (runDetails: any) => {
     if (contextUpdateError !== undefined) {
+      runResult = { ...runDetails, failed: false };
       radio.emit(
         "logFailure",
         `\nStopped the run: ${contextUpdateError.message}\n`,
@@ -385,10 +433,12 @@ const invariantTest = async (
       return;
     }
 
+    runResult = { ...runDetails, firstFailure };
     reporter(runDetails, radio, "invariant", failureStatistics.get());
 
-    // Persist failures for regression testing.
-    if (runDetails.failed) {
+    // Persist failures for regression testing. A replay to record the
+    // state repeats a failure that is already saved.
+    if (runDetails.failed && recorder === undefined) {
       persistFailure(runDetails, "invariant", rendezvousContractId, dial);
     }
   };
@@ -462,7 +512,9 @@ const invariantTest = async (
           return;
         }
 
+        recorder?.startRun();
         for (const [index, selectedFunction] of r.selectedFunctions.entries()) {
+          failureFunction = selectedFunction.name;
           const [sutCallerWallet, sutCallerAddress] = r.sutCallers[index];
 
           const printedFunctionArgs = r.selectedFunctionsArgsList[index]
@@ -482,6 +534,11 @@ const invariantTest = async (
           }
 
           try {
+            recorder?.record(
+              simnet,
+              r.rendezvousContractId,
+              selectedFunction.name,
+            );
             const functionCall = simnet.callPublicFn(
               r.rendezvousContractId,
               selectedFunction.name,
@@ -601,6 +658,7 @@ const invariantTest = async (
           }
         }
 
+        failureFunction = r.selectedInvariant.name;
         const printedInvariantArgs = r.invariantArgs
           .map((cv) => cvToString(cv))
           .join(" ");
@@ -609,6 +667,11 @@ const invariantTest = async (
           r.invariantCaller;
 
         try {
+          recorder?.record(
+            simnet,
+            r.rendezvousContractId,
+            r.selectedInvariant.name,
+          );
           const { result: invariantCallResult } = simnet.callReadOnlyFn(
             r.rendezvousContractId,
             r.selectedInvariant.name,
@@ -696,6 +759,7 @@ const invariantTest = async (
       verbose: false,
     },
   );
+  return runResult!;
 };
 
 /**

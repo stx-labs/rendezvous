@@ -115,10 +115,17 @@ export const reportStateBeforeFailure = async (
     );
     return;
   }
-  if (!replayed.failed || replayed.numRuns !== numRuns) {
+  if (
+    !replayed.failed ||
+    replayed.numRuns !== numRuns ||
+    runDetails.firstFailure === undefined ||
+    replayed.firstFailure?.functionName !==
+      runDetails.firstFailure.functionName ||
+    replayed.firstFailure.message !== runDetails.firstFailure.message
+  ) {
     radio.emit(
       "logFailure",
-      "The replay did not fail at the same run, so no state is reported.\n",
+      "The snapshot could not be reproduced (for example, due to a nondeterministic dialer), so no state is reported.\n",
     );
     return;
   }
@@ -134,7 +141,7 @@ export const reportStateBeforeFailure = async (
   const contractName = getContractNameFromContractId(contractId);
   radio.emit(
     "logMessage",
-    `\nContract state before each call of run ${numRuns}, the first ` +
+    `\nReplayed contract state before each call of run ${numRuns}, the first ` +
       `failing run (${contractName} data variables only):`,
   );
   for (const snapshot of recorder.snapshots) {

@@ -8,6 +8,7 @@ export interface RunDetails
     Pick<RunDetailsCommon<unknown>, "failed" | "numRuns" | "seed">,
     Partial<Pick<RunDetailsCommon<unknown>, "counterexamplePath">> {
   counterexample: CounterExample[];
+  firstFailure?: { functionName: string; message: string };
   error?: Error;
   errorInstance?: Error;
 }

@@ -9,9 +9,9 @@ import {
   cvToString,
   type ClarityValue,
 } from "@stacks/transactions";
-import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
+import { dim, green, red, underline, yellow } from "./colors";
 import { DialerRegistry, PostDialerError, PreDialerError } from "./dialer";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { RunDetails, Statistics } from "./heatstroke.types";
@@ -411,7 +411,11 @@ const invariantTest = async (
   }
 
   let runResult: RunDetails | undefined = undefined;
-  const failureStatistics = trackFailureStatistics(statistics);
+  let failureFunction = "";
+  let firstFailure: RunDetails["firstFailure"] = undefined;
+  const failureStatistics = trackFailureStatistics(statistics, (error) => {
+    firstFailure = { functionName: failureFunction, message: String(error) };
+  });
 
   // A failed context update is a harness error, not a counterexample. Once it
   // happens, later cases are skipped so fast-check does not shrink it, and it
@@ -429,7 +433,7 @@ const invariantTest = async (
       return;
     }
 
-    runResult = runDetails;
+    runResult = { ...runDetails, firstFailure };
     reporter(runDetails, radio, "invariant", failureStatistics.get());
 
     // Persist failures for regression testing. A replay to record the
@@ -510,6 +514,7 @@ const invariantTest = async (
 
         recorder?.startRun();
         for (const [index, selectedFunction] of r.selectedFunctions.entries()) {
+          failureFunction = selectedFunction.name;
           const [sutCallerWallet, sutCallerAddress] = r.sutCallers[index];
 
           const printedFunctionArgs = r.selectedFunctionsArgsList[index]
@@ -653,6 +658,7 @@ const invariantTest = async (
           }
         }
 
+        failureFunction = r.selectedInvariant.name;
         const printedInvariantArgs = r.invariantArgs
           .map((cv) => cvToString(cv))
           .join(" ");

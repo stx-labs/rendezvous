@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
-import { red, yellow } from "ansicolor";
 
 import {
   helpMessage,
@@ -13,6 +12,7 @@ import {
   parseCli,
   type RunConfig,
 } from "./cli";
+import { red, yellow } from "./colors";
 import { resolveAccounts } from "./config";
 import { checkInvariants } from "./invariant";
 import { checkProperties } from "./property";
@@ -69,7 +69,7 @@ export const main = async () => {
   const radio = new EventEmitter();
   radio.on("logMessage", (log) => logger(log));
   radio.on("logInfo", (log) => logger(yellow(log), "info"));
-  radio.on("logFailure", (log) => logger(red(log), "error"));
+  radio.on("logFailure", (log) => logger(red(log, process.stderr), "error"));
 
   const runConfig = parseCliOrExit(process.argv.slice(2), radio);
 

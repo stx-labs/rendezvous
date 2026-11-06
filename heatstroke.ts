@@ -2,9 +2,9 @@ import type { EventEmitter } from "node:events";
 
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import { cvToString, type ClarityValue } from "@stacks/transactions";
-import { green } from "ansicolor";
 import fc from "fast-check";
 
+import { green } from "./colors";
 import type {
   InvariantCounterExample,
   RunDetails,
@@ -258,7 +258,10 @@ export const incrementCount = (counts: Map<string, number>, name: string) => {
  * @returns `track` to wrap the predicate and `get` to read the statistics to
  * report.
  */
-export const trackFailureStatistics = (statistics: Statistics) => {
+export const trackFailureStatistics = (
+  statistics: Statistics,
+  onFirstFailure?: (error: unknown) => void,
+) => {
   let atFailure: Statistics | undefined = undefined;
   return {
     track:
@@ -269,7 +272,10 @@ export const trackFailureStatistics = (statistics: Statistics) => {
         } catch (error) {
           // A failed precondition skips the case, it is not a failure.
           if (!fc.PreconditionFailure.isFailure(error)) {
-            atFailure ??= structuredClone(statistics);
+            if (atFailure === undefined) {
+              atFailure = structuredClone(statistics);
+              onFirstFailure?.(error);
+            }
           }
           throw error;
         }

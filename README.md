@@ -69,12 +69,10 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
 - `--snapshot` – After a failure, report the target contract's data variables
   before each call of the failing run (opt-in).
 
-Use `rv example counter invariant --snapshot` to reset simnet and replay
-its captured seed up to the first failing run as it was before shrinking.
-It prints the target contract's data variables before each call. Passing
-runs do no extra replay. Maps, constants, token balances, and other
-contracts are excluded. Dialers must be deterministic and must not depend on
-mutable module state. Set `"snapshot": true` in config.
+After a failure, Rendezvous resets simnet and replays the seed without
+shrinking. Only the target contract's data variables are shown. Dialers
+must be deterministic and must not depend on mutable module state. Set
+`"snapshot": true` in config.
 
 ---
 

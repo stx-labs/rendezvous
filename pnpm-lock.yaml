@@ -175,9 +175,6 @@ importers:
       '@stacks/transactions':
         specifier: ^7.6.0
         version: 7.6.0
-      ansicolor:
-        specifier: ^2.0.3
-        version: 2.0.3
       fast-check:
         specifier: ^4.10.2
         version: 4.10.2

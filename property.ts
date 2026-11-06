@@ -8,9 +8,9 @@ import {
   cvToString,
   type ClarityValue,
 } from "@stacks/transactions";
-import { dim, green, red, underline, yellow } from "ansicolor";
 import fc from "fast-check";
 
+import { dim, green, red, underline, yellow } from "./colors";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { RunDetails, Statistics } from "./heatstroke.types";
 import { strategyFor } from "./lib";
@@ -365,10 +365,14 @@ const propertyTest = async (
   }
 
   let result: RunDetails | undefined = undefined;
-  const failureStatistics = trackFailureStatistics(statistics);
+  let failureFunction = "";
+  let firstFailure: RunDetails["firstFailure"] = undefined;
+  const failureStatistics = trackFailureStatistics(statistics, (error) => {
+    firstFailure = { functionName: failureFunction, message: String(error) };
+  });
 
   const radioReporter = async (runDetails: any) => {
-    result = runDetails;
+    result = { ...runDetails, firstFailure };
     reporter(runDetails, radio, "test", failureStatistics.get());
 
     // Persist failures for regression testing. A replay to record the
@@ -428,6 +432,7 @@ const propertyTest = async (
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
       failureStatistics.track(async (r) => {
+        failureFunction = r.selectedTestFunction.name;
         recorder?.startRun();
         const printedTestFunctionArgs = r.functionArgs
           .map((cv) => cvToString(cv))
@@ -451,6 +456,7 @@ const propertyTest = async (
             );
           } catch (error) {
             if (discardFunctionName !== undefined) {
+              failureFunction = discardFunctionName;
               recorder?.record(
                 simnet,
                 r.rendezvousContractId,

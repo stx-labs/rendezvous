@@ -414,12 +414,13 @@ invariant check.
 Passing runs are not replayed. Maps, constants, token balances, and other
 contracts are excluded. Snapshots describe the first failure before
 shrinking; use `--bail` to keep the ordinary failure report on that run.
-If replay passes or fails at a different run, no state is shown. A failure
-before any recorded contract call also has no state to show.
+If replay passes or fails at a different run, function, or error, no state is
+shown. A failure before any recorded contract call also has no state to show.
 
 Dialers must be deterministic and must not depend on mutable module state;
-replay invokes them again without resetting that state. Equal failure run
-numbers do not prove identical execution. For regression tests, snapshots
+replay invokes them again without resetting that state. Matching failure
+identity does not prove identical execution; the displayed state is from the
+replay and may differ from the original. For regression tests, snapshots
 are replayed after all regressions so replay cannot affect later regressions.
 Snapshot errors remain secondary to the original failure. Replay does not save
 another failure.
@@ -439,6 +440,17 @@ another failure.
 | `--config=<file>`            | Uses a JSON config file for all run options.                                            | `rv root contract test --config=rv.config.json`   |
 | `--fail-on-unchecked`        | Exits with code 1 when a test or invariant goes unchecked, or every public call throws. | `rv root contract test --fail-on-unchecked`       |
 | `--snapshot`                 | Reports the contract's data variables before a failure.                                 | `rv root contract test --snapshot`                |
+
+### Colored Output
+
+Rendezvous colors its output only when writing to a terminal, so redirected or piped output is plain text. It follows the standard environment variables:
+
+- `NO_COLOR=1` disables colors.
+- `FORCE_COLOR=1` enables colors even when the output is not a terminal, for example in CI logs. It takes precedence over `NO_COLOR`.
+
+```bash
+FORCE_COLOR=1 rv root contract test
+```
 
 ---
 

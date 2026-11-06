@@ -46,7 +46,13 @@ const fakeSimnet = () =>
   }) as unknown as Simnet & { getDataVar: ReturnType<typeof vi.fn> };
 
 const failedRun = (numRuns: number) =>
-  ({ failed: true, numRuns, seed: 1, counterexample: [] }) as RunDetails;
+  ({
+    failed: true,
+    numRuns,
+    seed: 1,
+    counterexample: [],
+    firstFailure: { functionName: "test-a", message: "error" },
+  }) as RunDetails;
 
 describe("State recorder", () => {
   it("records the data variables of the target run only", () => {
@@ -140,10 +146,33 @@ describe("Reporting the state before a failure", () => {
 
     // Assert
     expect(logs).toContain(
-      "The replay did not fail at the same run, so no state is reported.\n",
+      "The snapshot could not be reproduced (for example, due to a nondeterministic dialer), so no state is reported.\n",
     );
     expect(logs.some((log) => log.includes("counter: u7"))).toBe(false);
   });
+
+  it.each([
+    { functionName: "other", message: "error" },
+    { functionName: "test-a", message: "different error" },
+  ])(
+    "rejects a different failure at the same run: %o",
+    async (firstFailure) => {
+      const { logs, radio } = captureLogs();
+      await reportStateBeforeFailure(
+        failedRun(1),
+        "ST1.contract",
+        async () => {},
+        async (_radio, recorder) => {
+          recorder.startRun();
+          recorder.record(fakeSimnet(), "ST1.contract", "test-a");
+          return { ...failedRun(1), firstFailure };
+        },
+        radio,
+      );
+      expect(logs.join("\n")).toContain("snapshot could not be reproduced");
+      expect(logs.join("\n")).not.toContain("counter: u7");
+    },
+  );
 
   it.each(["reset", "replay"])(
     "keeps a snapshot %s rejection secondary",
@@ -165,7 +194,9 @@ describe("Reporting the state before a failure", () => {
       expect(logs).toContain(
         `Could not replay the failure for a state snapshot: ${failure}\n`,
       );
-      expect(logs.join("\n")).not.toContain("Contract state before");
+      expect(logs.join("\n")).not.toContain(
+        "Replayed contract state before each call",
+      );
       expect(reject).toHaveBeenCalledTimes(1);
     },
   );
@@ -182,7 +213,9 @@ describe("Reporting the state before a failure", () => {
     expect(logs).toContain(
       "No contract call was recorded during the failing run, so no state is reported.\n",
     );
-    expect(logs.join("\n")).not.toContain("Contract state before");
+    expect(logs.join("\n")).not.toContain(
+      "Replayed contract state before each call",
+    );
   });
 
   it("reports a read error instead of the state", async () => {
@@ -312,7 +345,7 @@ epoch = 3.0
 
       expect(requested).toEqual([undefined, seeds[0]]);
       expect(seeds).toEqual([seeds[0], seeds[0]]);
-      expect(output).toContain("Contract state before each call");
+      expect(output).toContain("contract state before each call");
       expect(process.exitCode).toBe(1);
     },
   );
@@ -328,7 +361,7 @@ epoch = 3.0
         "failure...",
     );
     expect(output).toContain(
-      "Contract state before each call of run 5, the first failing run " +
+      "contract state before each call of run 5, the first failing run " +
         "(counter data variables only):",
     );
     expect(output).toMatch(
@@ -389,6 +422,28 @@ epoch = 3.0
     expect(process.exitCode).toBe(1);
   });
 
+  it("suppresses snapshots when a stateful dialer changes the failure", async () => {
+    const dialer = join(project, "dialer.cjs");
+    writeFileSync(
+      dialer,
+      'let calls = 0; exports.postOnce = () => { if (++calls === 1) throw new Error("first post failure"); };',
+    );
+
+    const output = await run([
+      "invariant",
+      "--seed=17",
+      "--runs=100",
+      "--bail",
+      `--dial=${dialer}`,
+      "--snapshot",
+    ]);
+
+    expect(output).toContain("first post failure");
+    expect(output).toContain("snapshot could not be reproduced");
+    expect(output).not.toContain("contract state before each call");
+    expect(process.exitCode).toBe(1);
+  });
+
   it("runs all invariant regressions before replaying snapshots", async () => {
     const directory = join(project, ".rendezvous-regressions");
     mkdirSync(directory);
@@ -427,7 +482,7 @@ epoch = 3.0
 
     expect(output).toContain("Could not update the context");
     expect(output).not.toContain("Replaying seed");
-    expect(output).not.toContain("Contract state before");
+    expect(output).not.toContain("Replayed contract state before each call");
     expect(process.exitCode).toBe(1);
   });
 
@@ -447,7 +502,7 @@ epoch = 3.0
     // Assert
     expect(output).toContain("OK, properties passed after 10 runs.");
     expect(output).not.toContain("Replaying");
-    expect(output).not.toContain("Contract state");
+    expect(output).not.toContain("Replayed contract state before each call");
   });
 
   it("does not report state without --snapshot", async () => {
@@ -457,6 +512,6 @@ epoch = 3.0
     // Assert
     expect(output).toContain("Error: Property failed after 5 tests.");
     expect(output).not.toContain("Replaying");
-    expect(output).not.toContain("Contract state");
+    expect(output).not.toContain("Replayed contract state before each call");
   });
 });

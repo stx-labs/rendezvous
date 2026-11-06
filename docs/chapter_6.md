@@ -46,7 +46,7 @@ To run Rendezvous, use the following command:
 
 ```bash
 rv <path-to-clarinet-project> <contract-name> <type> \
-  [--config] [--seed] [--runs] [--regr] [--bail] [--fail-on-unchecked] [--dial]
+  [pattern] [--config] [--seed] [--runs] [--regr] [--bail] [--fail-on-unchecked] [--dial]
 ```
 
 Let's break down each part of the command.
@@ -98,6 +98,13 @@ The `<type>` argument specifies the testing technique to use. The available opti
 - `test` – Runs property-based tests.
 - `invariant` – Runs invariant tests.
 
+An optional pattern after the type selects functions by their complete name:
+`*` matches any sequence, `?` matches one character, and `\` escapes the next
+character. In `test` mode it matches `test-` functions; in `invariant` mode it
+matches `invariant-` functions. For example, `rv ./root contract test
+'*transfer*'` selects tests whose names contain `transfer`. A pattern that
+matches no executable functions exits with an error.
+
 For a deeper understanding of these techniques and when to use each, see [Testing Methodologies](chapter_4.md).
 
 **Running property-based tests**
@@ -136,6 +143,11 @@ With this command, Rendezvous will:
 If an invariant check fails, it means the contract's state has **deviated from expected behavior**, revealing potential bugs.
 
 ### Options
+
+Patterns cannot be combined with `--regr`. A failure from a patterned run is
+not saved as a regression record because replaying that record would omit the
+pattern. Use the same command with `--seed=<seed>` from the failure output to
+reproduce it. When using `--config`, set `seed` in the config file instead.
 
 Rendezvous also provides additional options to customize test execution:
 

@@ -181,6 +181,49 @@ describe("Property testing outcomes", () => {
     expect(result.exitCode).toBe(1);
   });
 
+  it("rejects a discard function with parameters in a different order", async () => {
+    const result = await run(
+      "(define-read-only (can-test-valid (b bool) (a bool)) a) " +
+        "(define-private (test-valid (a bool) (b bool)) (if a (ok true) (err u1)))",
+    );
+    expect(result.logs).toContain("Parameter mismatch");
+    expect(result.exitCode).toBe(1);
+    expect(result.paths).toHaveLength(0);
+  });
+
+  it.each([false, true])(
+    "rejects reordered mixed-type parameters before a positional type error (replay=%s)",
+    async (regr) => {
+      const load = vi
+        .spyOn(persistence, "loadFailures")
+        .mockReturnValue([
+          { seed: 17, numRuns: 2, timestamp: 0, dial: undefined },
+        ]);
+      const result = await run(
+        "(define-read-only (can-test-mixed (flag bool) (amount uint)) flag) " +
+          "(define-private (test-mixed (amount uint) (flag bool)) (ok true))",
+        "test",
+        true,
+        regr,
+      );
+      expect(result.logs).toContain("Parameter mismatch");
+      expect(result.logs).not.toContain("TypeValueError");
+      expect(result.exitCode).toBe(1);
+      expect(result.paths).toHaveLength(0);
+      expect(load).not.toHaveBeenCalled();
+    },
+  );
+
+  it("runs a matching multi-argument guard with positional values", async () => {
+    const result = await run(
+      "(define-read-only (can-test-mixed (amount uint) (flag bool)) (or (not flag) (> amount u0))) " +
+        "(define-private (test-mixed (amount uint) (flag bool)) (if (and flag (is-eq amount u0)) (err u1) (ok true)))",
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.logs).toContain("OK, properties passed after 20 runs.");
+    expect(result.paths).toHaveLength(0);
+  });
+
   it("flags a regression run without regressions as unchecked", async () => {
     vi.spyOn(persistence, "loadFailures").mockReturnValue([]);
     const result = await run(

@@ -167,13 +167,19 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
     };
   }
 
-  const seed = options.seed ? parseInt(options.seed, 10) : undefined;
-  if (seed !== undefined && (!Number.isInteger(seed) || isNaN(seed))) {
+  const seed = options.seed !== undefined ? Number(options.seed) : undefined;
+  if (
+    options.seed !== undefined &&
+    (!/^[+-]?\d+$/.test(options.seed) || !Number.isInteger(seed))
+  ) {
     throw new Error(`"seed" must be an integer. Got: "${options.seed}".`);
   }
 
-  const runs = options.runs ? parseInt(options.runs, 10) : undefined;
-  if (runs !== undefined && (!Number.isInteger(runs) || runs < 1)) {
+  const runs = options.runs !== undefined ? Number(options.runs) : undefined;
+  if (
+    options.runs !== undefined &&
+    (!/^[+-]?\d+$/.test(options.runs) || !Number.isInteger(runs) || runs! < 1)
+  ) {
     throw new Error(
       `"runs" must be a positive integer. Got: "${options.runs}".`,
     );

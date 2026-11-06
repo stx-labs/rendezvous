@@ -26,19 +26,21 @@ const { version } = JSON.parse(
 export const helpMessage = `
   rv v${version}
 
-  Usage: rv <path> <contract> <type> [OPTIONS]
+  Usage: rv <path> <contract> <type> [pattern] [OPTIONS]
 
   Arguments:
     <path>        Path to the Clarinet project
     <contract>    Contract name to fuzz
     <type>        Test type: test | invariant
+    [pattern]     Whole-name match: * and ? are wildcards; backslash escapes
+                  Quote patterns, e.g. 'test-foo*'
 
   Options:
     --config=<f>  Path to config file (JSON)
     --seed=<n>    Seed for replay functionality
     --runs=<n>    Number of test iterations [default: 100]
     --dial=<f>    Path to custom dialers file
-    --regr        Run regression tests only
+    --regr        Run regression tests only (cannot use a pattern)
     --bail        Stop on first failure
     --fail-on-unchecked
                   Fail if a test or invariant is never checked, or if
@@ -55,6 +57,7 @@ export interface RunConfig {
   manifestDir: string;
   sutContractName: string;
   type: "test" | "invariant";
+  pattern: string | undefined;
   seed: number | undefined;
   runs: number | undefined;
   bail: boolean;
@@ -111,7 +114,8 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
     }
   }
 
-  const [manifestDir, sutContractName, type] = positionalArgs;
+  const [manifestDir, sutContractName, type, pattern, ...extraArgs] =
+    positionalArgs;
 
   if (!manifestDir) {
     throw new Error(
@@ -129,6 +133,20 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
   if (!normalizedType || !["test", "invariant"].includes(normalizedType)) {
     throw new Error(
       "Invalid type provided. Please provide the type of test to be executed. Possible values: test, invariant.",
+    );
+  }
+
+  if (extraArgs.length > 0) {
+    throw new Error(
+      `Unexpected argument: "${extraArgs[0]}". Quote the pattern and supply only one.`,
+    );
+  }
+  if (
+    pattern !== undefined &&
+    (options.config ? fileConfig.regr : options.regr)
+  ) {
+    throw new Error(
+      "A pattern cannot be combined with --regr (including regr in a config file).",
     );
   }
 
@@ -154,6 +172,7 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
       manifestDir,
       sutContractName,
       type: normalizedType as "test" | "invariant",
+      pattern,
       seed: fileConfig.seed,
       runs: fileConfig.runs,
       bail: fileConfig.bail ?? false,
@@ -183,6 +202,7 @@ export const parseCli = (argv: string[]): RunConfig | undefined => {
     manifestDir,
     sutContractName,
     type: normalizedType as "test" | "invariant",
+    pattern,
     seed,
     runs,
     bail: options.bail ?? false,
@@ -208,6 +228,9 @@ export const logRunConfig = (
   radio.emit("logMessage", `Using manifest path: ${manifestPath}`);
   radio.emit("logMessage", `Target contract: ${config.sutContractName}`);
 
+  if (config.pattern !== undefined) {
+    radio.emit("logMessage", `Using pattern: ${config.pattern}`);
+  }
   if (config.seed !== undefined) {
     radio.emit("logMessage", `Using seed: ${config.seed}`);
   }

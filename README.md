@@ -34,7 +34,7 @@ npm install @stacks/rendezvous
 ### Usage
 
 ```
-npx rv <path-to-clarinet-project> <contract-name> <type>
+npx rv <path-to-clarinet-project> <contract-name> <type> [pattern]
 ```
 
 ---
@@ -48,6 +48,11 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
 - `type` - Type of test to run. Options:
   - `test` - Run property-based tests.
   - `invariant` - Run invariant tests.
+- `pattern` - Optional whole-name pattern for selecting `test-` functions in
+  `test` mode or `invariant-` functions in `invariant` mode. `*` matches any
+  sequence of characters, `?` matches one character, and backslash escapes the
+  next character. For example, `rv example counter test '*transfer*'` selects
+  test functions whose names contain `transfer`.
 
 **Options:**
 
@@ -66,6 +71,11 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
   throws; these only warn by default.
 - `--dial` – The path to a JavaScript file containing custom pre- and
   post-execution functions (dialers).
+
+Patterns cannot be combined with `--regr`. If a patterned run fails, it does
+not save a regression record; try rerunning the same command with
+`--seed=<seed>` from the failure output. When using `--config`, set `seed`
+in the config file instead.
 
 ---
 

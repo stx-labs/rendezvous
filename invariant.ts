@@ -30,6 +30,7 @@ import {
   getContractNameFromContractId,
   getFunctionsListForContract,
   LOG_DIVIDER,
+  matchesPattern,
 } from "./shared";
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
 import {
@@ -72,6 +73,7 @@ export const checkInvariants = async (
   radio: EventEmitter,
   eligibleAccounts: Map<string, string>,
   allAddresses: string[],
+  pattern?: string,
 ) => {
   // The Rendezvous identifier is the first one in the list. Only one contract
   // can be fuzzed at a time.
@@ -87,6 +89,7 @@ export const checkInvariants = async (
   // invariant functions for each Rendezvous contract afterwards.
   const rendezvousInvariantFunctions = filterInvariantFunctions(
     rendezvousAllFunctions,
+    pattern,
   );
 
   const sutFunctions = rendezvousSutFunctions.get(rendezvousContractId)!;
@@ -187,6 +190,15 @@ export const checkInvariants = async (
     rendezvousContractId,
   );
 
+  if (pattern !== undefined && invariants.length === 0) {
+    radio.emit(
+      "logFailure",
+      `\nNo executable invariant functions match "${pattern}" in the "${targetContractName}" contract.\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   if (functions?.length === 0) {
     radio.emit(
       "logMessage",
@@ -282,6 +294,7 @@ export const checkInvariants = async (
       radio,
       eligibleAccounts,
       allAddresses,
+      pattern,
       functions,
       invariants,
       projectTraitImplementations,
@@ -309,6 +322,7 @@ const invariantTest = async (
     radio,
     eligibleAccounts,
     allAddresses,
+    pattern,
     functions,
     invariants,
     projectTraitImplementations,
@@ -389,7 +403,14 @@ const invariantTest = async (
 
     // Persist failures for regression testing.
     if (runDetails.failed) {
-      persistFailure(runDetails, "invariant", rendezvousContractId, dial);
+      if (pattern !== undefined) {
+        radio.emit(
+          "logMessage",
+          `Regression not saved for a filtered failure; repeat the same command with --seed=${runDetails.seed} (with --config, set seed in the config instead).`,
+        );
+      } else {
+        persistFailure(runDetails, "invariant", rendezvousContractId, dial);
+      }
     }
   };
 
@@ -815,13 +836,16 @@ const filterSutFunctions = (
 
 const filterInvariantFunctions = (
   allFunctionsMap: Map<string, ContractInterfaceFunction[]>,
+  pattern: string | undefined,
 ) =>
   new Map(
     Array.from(allFunctionsMap, ([contractId, functions]) => [
       contractId,
       functions.filter(
         ({ access, name }) =>
-          access === "read_only" && name.startsWith("invariant-"),
+          access === "read_only" &&
+          name.startsWith("invariant-") &&
+          (pattern === undefined || matchesPattern(name, pattern)),
       ),
     ]),
   );

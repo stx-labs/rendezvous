@@ -397,9 +397,49 @@ A config file is a JSON object with optional fields:
 | `dial`              | string           | Path to custom dialers file.                            |
 | `fail_on_unchecked` | boolean          | Fail the run when a test or invariant goes unchecked.   |
 
+Set `coverage` to `true` to report coverage. Use `coverage_json` and
+`coverage_lcov` for JSON and LCOV output paths; both require `coverage`.
+
 The `accounts` field lets you define custom accounts for testing. By default (`"overwrite"` mode), these replace the Devnet.toml accounts entirely. With `"concatenate"` mode, config accounts are merged with the existing Devnet accounts — if a name appears in both, the config account's address takes precedence.
 
 Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like `"sedd"` instead of `"seed"`), and also warns if CLI flags are passed alongside `--config`.
+
+**7. Reporting Coverage**
+
+Use `--coverage` to see how much of the Clarity code a run exercised:
+
+```bash
+rv root contract invariant --coverage
+```
+
+At the end of the run, Rendezvous prints the number of covered lines and
+branches, followed by the counts for each file the run reached:
+
+```
+Coverage: 19/831 lines, 3/257 branches in 0.833 s.
+  contracts/counter.clar: 19/34 lines, 3/8 branches
+```
+
+Totals include project sources, including local test functions and other
+local project contracts. The verified SDK report excludes boot and imported
+mainnet requirement sources, even when a test calls those requirements.
+Only positive line and branch hit counts are covered. Coverage tracking is
+opt-in; ordinary default invocations leave it disabled.
+Coverage cannot be used with `CLARINET_DEBUG_PORT`: the Clarinet debug
+session does not support coverage reports.
+
+To keep the results, add `--coverage-lcov` for merged LCOV records, or
+`--coverage-json` for per-file totals and a curve of coverage increases:
+
+```bash
+rv root contract invariant --coverage \
+  --coverage-lcov=coverage.lcov --coverage-json=coverage.json
+```
+
+`--coverage-json` collects after every candidate, including discards,
+failures, and shrinking candidates, which adds overhead. Its `evaluations`
+count includes those candidates. Coverage shows which code ran, not
+whether a property or invariant checks it correctly.
 
 ### Summary
 

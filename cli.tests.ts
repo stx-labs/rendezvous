@@ -88,6 +88,63 @@ describe("CLI parsing with parseCli", () => {
     }
   });
 
+  it("keeps coverage disabled by default", () => {
+    const config = parseCli(["./example", "counter", "test"])!;
+    expect(config.coverage).toBe(false);
+    expect(config.coverageJson).toBeUndefined();
+    expect(config.coverageLcov).toBeUndefined();
+  });
+
+  it("accepts opt-in coverage and its output paths", () => {
+    const config = parseCli([
+      "./example",
+      "counter",
+      "test",
+      "--coverage",
+      "--coverage-json=curve.json",
+      "--coverage-lcov=coverage.lcov",
+    ])!;
+    expect(config.coverage).toBe(true);
+    expect(config.coverageJson).toBe("curve.json");
+    expect(config.coverageLcov).toBe("coverage.lcov");
+  });
+
+  it("requires explicit opt-in for coverage output paths", () => {
+    expect(() =>
+      parseCli(["./example", "counter", "test", "--coverage-json=curve.json"]),
+    ).toThrow("Coverage outputs require --coverage.");
+    expect(() =>
+      parseCli([
+        "./example",
+        "counter",
+        "test",
+        "--coverage",
+        "--coverage-json=",
+      ]),
+    ).toThrow('"coverage-json" must be a non-empty string.');
+  });
+
+  it("takes coverage only from the config when --config is provided", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rendezvous-test-coverage-cli-"));
+    const configPath = join(dir, "rv.config.json");
+    try {
+      writeFileSync(configPath, JSON.stringify({ coverage: false }));
+      const config = parseCli([
+        "./example",
+        "counter",
+        "test",
+        `--config=${configPath}`,
+        "--coverage",
+        "--coverage-json=ignored.json",
+      ])!;
+      expect(config.coverage).toBe(false);
+      expect(config.coverageJson).toBeUndefined();
+      expect(config.warnings[0]).toContain("--coverage, --coverage-json");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("normalizes type to lowercase", () => {
     const config = parseCli(["./example", "counter", "InVaRiAnT"])!;
     expect(config.type).toBe("invariant");

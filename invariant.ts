@@ -12,6 +12,7 @@ import {
 import fc from "fast-check";
 
 import { dim, green, red, underline, yellow } from "./colors";
+import { observedAsyncProperty } from "./coverage";
 import { DialerRegistry, PostDialerError, PreDialerError } from "./dialer";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
@@ -399,8 +400,9 @@ const invariantTest = async (
   // Set up context in simnet by initializing state for SUT.
   initializeClarityContext(simnet, rendezvousContractId, functions);
 
+  const asyncProperty = observedAsyncProperty(radio);
   await fc.assert(
-    fc.asyncProperty(
+    asyncProperty(
       fc
         .record({
           // The target contract identifier. It is a constant value equal

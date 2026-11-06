@@ -5,6 +5,7 @@ import { cvToString, type ClarityValue } from "@stacks/transactions";
 import fc from "fast-check";
 
 import { green } from "./colors";
+import { PostDialerError } from "./dialer";
 import type {
   InvariantCounterExample,
   RunDetails,
@@ -65,6 +66,8 @@ export const reporter = (
     switch (type) {
       case "invariant": {
         const ce = counterexample[0] as InvariantCounterExample;
+        const postError = error instanceof PostDialerError ? error : undefined;
+        const count = postError ? postError.callIndex + 1 : undefined;
         // Report specific run data for the invariant testing type.
         radio.emit("logFailure", `\nCounterexample:`);
         radio.emit(
@@ -76,11 +79,13 @@ export const reporter = (
         radio.emit(
           "logFailure",
           `- Functions: ${ce.selectedFunctions
+            .slice(0, count)
             .map(
               (selectedFunction: ContractInterfaceFunction) =>
                 selectedFunction.name,
             )
             .join(", ")} (${ce.selectedFunctions
+            .slice(0, count)
             .map(
               (selectedFunction: ContractInterfaceFunction) =>
                 selectedFunction.access,
@@ -90,6 +95,7 @@ export const reporter = (
         radio.emit(
           "logFailure",
           `- Arguments: ${ce.selectedFunctionsArgsList
+            .slice(0, count)
             .map((selectedFunctionArgs: ClarityValue[]) =>
               selectedFunctionArgs.map((cv) => cvToString(cv)).join(" "),
             )
@@ -98,37 +104,39 @@ export const reporter = (
         radio.emit(
           "logFailure",
           `- Callers  : ${ce.sutCallers
+            .slice(0, count)
             .map((sutCaller: [string, string]) => sutCaller[0])
             .join(", ")}`,
         );
         radio.emit(
           "logFailure",
           `- Outputs  : ${ce.selectedFunctions
+            .slice(0, count)
             .map((selectedFunction: ContractInterfaceFunction) =>
               JSON.stringify(selectedFunction.outputs),
             )
             .join(", ")}`,
         );
-        radio.emit(
-          "logFailure",
-          `- Invariant: ${ce.selectedInvariant.name} (${ce.selectedInvariant.access})`,
-        );
-        radio.emit(
-          "logFailure",
-          `- Arguments: ${(ce.invariantArgs as ClarityValue[])
-            .map((cv) => cvToString(cv))
-            .join(" ")}`,
-        );
-        radio.emit("logFailure", `- Caller   : ${ce.invariantCaller[0]}`);
+        if (!postError) {
+          radio.emit(
+            "logFailure",
+            `- Invariant: ${ce.selectedInvariant.name} (${ce.selectedInvariant.access})`,
+          );
+          radio.emit(
+            "logFailure",
+            `- Arguments: ${(ce.invariantArgs as ClarityValue[])
+              .map((cv) => cvToString(cv))
+              .join(" ")}`,
+          );
+          radio.emit("logFailure", `- Caller   : ${ce.invariantCaller[0]}`);
+        }
 
         radio.emit(
           "logFailure",
           `\nWhat happened? Rendezvous went on a rampage and found a weak spot:\n`,
         );
 
-        const formattedError = `The invariant "${
-          ce.selectedInvariant.name
-        }" returned:\n\n${clarityError
+        const formattedError = `${postError ? "Post-dialer failed" : `The invariant "${ce.selectedInvariant.name}" returned`}:\n\n${clarityError
           .toString()
           .split("\n")
           .map((line: string) => "    " + line)

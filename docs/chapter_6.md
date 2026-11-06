@@ -179,7 +179,7 @@ In this case, the seed is `426141810`. You can use it to rerun the exact same te
 rv root contract test --seed=426141810
 ```
 
-The `Counterexample path` line is fast-check's path to the counterexample, shown for diagnostics. Rendezvous has no option to replay a path: the seed reproduces the run, with at least as many `--runs` and the same `--dial`.
+The `Counterexample path` line is fast-check's path to the counterexample, shown for diagnostics. Rendezvous has no option to replay a path. Use the same seed, run count, and dialer to repeat a campaign; stateful counterexamples may not reproduce as described in [issue #312](https://github.com/stx-labs/rendezvous/issues/312).
 
 **3. Stop After First Failure**
 
@@ -193,7 +193,7 @@ This is useful when you want to examine the first failure without waiting for th
 
 **4. Using Dialers**
 
-Dialers allow you to define **pre- and post-execution functions** using JavaScript **during invariant testing**. To use a custom dialer file, run:
+Dialers allow you to define **pre- and post-execution functions** using JavaScript **during invariant testing**. TypeScript modules require a runtime or loader that can load TypeScript from CommonJS; Node 20 needs a loader. To use a custom dialer file, run:
 
 ```bash
 rv root contract invariant --dial=./custom-dialer.js
@@ -205,16 +205,18 @@ In that file, you’ll find a **post-dialer** designed as a **sanity check** for
 
 **How Dialers Work**
 
-During **invariant testing**, Rendezvous picks up dialers when executing public function calls:
+Rendezvous picks up dialers when executing public calls in invariant mode:
 
 - **Pre-dialers** run **before** each public function call.
-- **Post-dialers** run **after** each public function call.
+- **Post-dialers** run **after** public calls that return `(ok ...)`.
 
 Both have access to an object containing:
 
 - `selectedFunction` – The function being executed.
 - `functionCall` – The result of the function call (`undefined` for **pre-dialers**).
 - `clarityValueArguments` – The generated Clarity values used as arguments.
+- `simnet` – The live Clarinet simnet instance.
+- `contractId` – The fully qualified ID of the contract under test.
 
 **Example: Post-Dialer for SIP-010**
 
@@ -266,6 +268,27 @@ async function postTransferSip010PrintEvent(context) {
 ```
 
 This dialer ensures that any SIP-010 token contract properly emits the **memo print event** during transfers, helping to catch deviations from the standard.
+
+**Outside-in invariants in TypeScript**
+
+Export a function whose name starts with `post` to query live contract state
+and throw when an invariant fails.
+For example, [balances.cjs](https://github.com/stx-labs/rendezvous/blob/master/example/balances.cjs) reads four map keys and
+checks their sum against the total recorded by [balances.clar](https://github.com/stx-labs/rendezvous/blob/master/example/contracts/balances.clar).
+The contract has a planted bug that adds an extra unit to the total.
+
+```bash
+rv ./example balances invariant --dial=./example/balances.cjs
+```
+
+A thrown assertion fails the run, reports the call sequence, and saves a
+regression record with the dialer path. Use `--regr` to replay saved regressions.
+State accumulates across generated cases and shrink attempts, so stateful
+counterexamples (including Clarity invariants) may not reproduce reliably; see
+[issue #312](https://github.com/stx-labs/rendezvous/issues/312). Dialers run in
+invariant mode and require the usual Clarity invariant and context helpers.
+Post-dialers currently run after `(ok ...)` responses. Use read-only calls or
+map reads for assertions: mutating simnet changes state for subsequent calls.
 
 **5. Regression Testing**
 

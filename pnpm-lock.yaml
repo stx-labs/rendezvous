@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       '@stacks/clarinet-sdk':
-        specifier: ^3.26.0
-        version: 3.26.0
+        specifier: ^4.0.0
+        version: 4.0.0
       '@stacks/clarinet-sdk-wasm':
         specifier: ^3.26.0
         version: 3.26.0
@@ -204,8 +204,8 @@ importers:
   example:
     dependencies:
       '@stacks/clarinet-sdk':
-        specifier: ^3.26.0
-        version: 3.26.0
+        specifier: ^4.0.0
+        version: 4.0.0
       '@stacks/rendezvous':
         specifier: ^1.1.0
         version: 1.1.0
@@ -223,7 +223,7 @@ importers:
         version: 5.0.5(@types/node@26.6.6)(@vitest/coverage-v8@5.0.5)(vite@8.0.16(@types/node@26.6.6))
       vitest-environment-clarinet:
         specifier: ^4.0.0
-        version: 4.0.0(@stacks/clarinet-sdk@3.26.0)(vitest@5.0.5)
+        version: 4.0.0(@stacks/clarinet-sdk@4.0.0)(vitest@5.0.5)
 
 packages:
 
@@ -549,8 +549,15 @@ packages:
   '@stacks/clarinet-sdk-wasm@3.26.0':
     resolution: {integrity: sha512-y+Lqov2cbMsUrDdSYzVXlqHw4F8IsVgDzMKL+dR6uEThbFEXOzJ98oXNDmBxIeuAIcW/DOW2pSxMJoeiSV1fvg==}
 
+  '@stacks/clarinet-sdk-wasm@4.0.0':
+    resolution: {integrity: sha512-depNs7/BRpyscd5IK7s9BBKdRPs1Y1S3KZfMOWxibez6Mp2CLVGhVYC028jiG3U7NAlBQK1RruJBibke8Am+pQ==}
+
   '@stacks/clarinet-sdk@3.26.0':
     resolution: {integrity: sha512-LaDuBhX7WfSkdQMTYry8Wx12LoB4BgahgzZUwMRTEjrKp3wiZoLvJTqcUvOKh7viaULwCiGfZzxh7fb8r69Vmw==}
+    engines: {node: '>=20'}
+
+  '@stacks/clarinet-sdk@4.0.0':
+    resolution: {integrity: sha512-3WlUyJkSecAm3Nw1yx9s5YM7i0Y578T8hXt7YXFzckHhBBapWv6IhHaZdfQxocwYQgS9u9K/Py1k9N2z7KYx/w==}
     engines: {node: '>=20'}
 
   '@stacks/common@7.6.0':
@@ -1479,9 +1486,18 @@ snapshots:
 
   '@stacks/clarinet-sdk-wasm@3.26.0': {}
 
+  '@stacks/clarinet-sdk-wasm@4.0.0': {}
+
   '@stacks/clarinet-sdk@3.26.0':
     dependencies:
       '@stacks/clarinet-sdk-wasm': 3.26.0
+      '@stacks/transactions': 7.6.0
+    transitivePeerDependencies:
+      - encoding
+
+  '@stacks/clarinet-sdk@4.0.0':
+    dependencies:
+      '@stacks/clarinet-sdk-wasm': 4.0.0
       '@stacks/transactions': 7.6.0
     transitivePeerDependencies:
       - encoding
@@ -2006,9 +2022,9 @@ snapshots:
       '@types/node': 26.6.6
       fsevents: 2.3.3
 
-  vitest-environment-clarinet@4.0.0(@stacks/clarinet-sdk@3.26.0)(vitest@5.0.5):
+  vitest-environment-clarinet@4.0.0(@stacks/clarinet-sdk@4.0.0)(vitest@5.0.5):
     dependencies:
-      '@stacks/clarinet-sdk': 3.26.0
+      '@stacks/clarinet-sdk': 4.0.0
       vitest: 5.0.5(@types/node@26.6.6)(@vitest/coverage-v8@5.0.5)(vite@8.0.16(@types/node@26.6.6))
 
   vitest@5.0.5(@types/node@26.6.6)(@vitest/coverage-v8@5.0.5)(vite@8.0.16(@types/node@26.6.6)):

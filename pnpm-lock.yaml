@@ -174,7 +174,7 @@ importers:
         version: 3.26.0
       '@stacks/transactions':
         specifier: ^7.6.0
-        version: 7.6.0
+        version: 7.7.0
       fast-check:
         specifier: ^4.10.2
         version: 4.10.2
@@ -211,7 +211,7 @@ importers:
         version: 1.1.0
       '@stacks/transactions':
         specifier: ^7.6.0
-        version: 7.6.0
+        version: 7.7.0
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -556,8 +556,14 @@ packages:
   '@stacks/common@7.6.0':
     resolution: {integrity: sha512-VUW8WDmZP4wXUNWVvpFerV+7LQ0PqIn8YOs8AjSUMA7ZOXIRLxJHoKxjfiHzJqazy7KlyryPW4kSNBCr7tLqhQ==}
 
+  '@stacks/common@7.7.0':
+    resolution: {integrity: sha512-5ZypU9BN/6jiG9d3pvd5Jgj96vO4vwxLQkYjczeF0ymNtMyv9Niw1F9FjazFJn/Gfcef+WBKFIX65mcA7Xk/SQ==}
+
   '@stacks/network@7.6.0':
     resolution: {integrity: sha512-Blm85nsEbvJoFIFaDp0QE9WMC0Hf+o3Yb0oIDwWu3PPgpVSdndb/bJQUeT6eJTs0ibS26A2E/5d5L0fb4Ff/lA==}
+
+  '@stacks/network@7.7.0':
+    resolution: {integrity: sha512-35CM8aFSRp+rs+HZKcOktFj6jWhj/SJfXxCeY6EF/Eoy7fVyFQIIaFhkUBhSl5dMVxkxhIUlh5puwP+jGMUIWw==}
 
   '@stacks/rendezvous@1.1.0':
     resolution: {integrity: sha512-kFo8X7iUumnjvrQ9cXLfCIGFTxHWYPCv5aIE9xd2zDq1BkPsC97wINIFzWeSINRnEnOxlFKNBJc+mZ0yGcJDig==}
@@ -565,6 +571,9 @@ packages:
 
   '@stacks/transactions@7.6.0':
     resolution: {integrity: sha512-s7F7eJtQVnZoB79j8pY9SLKhlvvdYZZD1NSDRWrFjzSJTDmxptL8c50S563WFja6KOhFOgg1jd+p0XWTxFAVyA==}
+
+  '@stacks/transactions@7.7.0':
+    resolution: {integrity: sha512-sBw3kSF3HJM1ivXIg8+UWULojs8AZ0UtB6ebL7M/YSXVHlXzVqH0pezp96ChmSqNfREKV2j9fq/t5c9OV4/qyA==}
 
   '@tybys/wasm-util@0.10.2':
     resolution: {integrity: sha512-RoBvJ2X0wuKlWFIjrwffGw1IqZHKQqzIchKaadZZfnNpsAYp2mM0h36JtPCjNDAHGgYez/15uMBpfGwchhiMgg==}
@@ -1488,6 +1497,8 @@ snapshots:
 
   '@stacks/common@7.6.0': {}
 
+  '@stacks/common@7.7.0': {}
+
   '@stacks/network@7.6.0':
     dependencies:
       '@stacks/common': 7.6.0
@@ -1495,11 +1506,15 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
+  '@stacks/network@7.7.0':
+    dependencies:
+      '@stacks/common': 7.7.0
+
   '@stacks/rendezvous@1.1.0':
     dependencies:
       '@stacks/clarinet-sdk': 3.26.0
       '@stacks/clarinet-sdk-wasm': 3.26.0
-      '@stacks/transactions': 7.6.0
+      '@stacks/transactions': 7.7.0
       ansicolor: 2.0.3
       fast-check: 4.10.2
     transitivePeerDependencies:
@@ -1515,6 +1530,14 @@ snapshots:
       lodash.clonedeep: 4.5.0
     transitivePeerDependencies:
       - encoding
+
+  '@stacks/transactions@7.7.0':
+    dependencies:
+      '@noble/hashes': 1.1.5
+      '@noble/secp256k1': 1.7.1
+      '@stacks/common': 7.7.0
+      '@stacks/network': 7.7.0
+      c32check: 2.0.0
 
   '@tybys/wasm-util@0.10.2':
     dependencies:

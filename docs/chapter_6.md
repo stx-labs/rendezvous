@@ -46,7 +46,7 @@ To run Rendezvous, use the following command:
 
 ```bash
 rv <path-to-clarinet-project> <contract-name> <type> \
-  [--config] [--seed] [--runs] [--regr] [--bail] [--fail-on-unchecked] [--dial]
+  [--config] [--seed] [--runs] [--regr] [--bail] [--fail-on-unchecked] [--dial] [--snapshot]
 ```
 
 Let's break down each part of the command.
@@ -396,10 +396,34 @@ A config file is a JSON object with optional fields:
 | `regr`              | boolean          | Run regression tests only.                              |
 | `dial`              | string           | Path to custom dialers file.                            |
 | `fail_on_unchecked` | boolean          | Fail the run when a test or invariant goes unchecked.   |
+| `snapshot`          | boolean          | Report the contract state before a failure.             |
 
 The `accounts` field lets you define custom accounts for testing. By default (`"overwrite"` mode), these replace the Devnet.toml accounts entirely. With `"concatenate"` mode, config accounts are merged with the existing Devnet accounts — if a name appears in both, the config account's address takes precedence.
 
 Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like `"sedd"` instead of `"seed"`), and also warns if CLI flags are passed alongside `--config`.
+
+**7. Reporting the Contract State Before a Failure**
+
+Use `rv root contract invariant --snapshot` (`"snapshot": true` in config) to
+reset simnet and replay the captured seed up to the first failing run.
+Snapshots show the target contract's `define-data-var` values and block
+heights before calls. Property tests record the failing test call, or a
+discard function that throws; invariant tests record each public call and the
+invariant check.
+
+Passing runs are not replayed. Maps, constants, token balances, and other
+contracts are excluded. Snapshots describe the first failure before
+shrinking; use `--bail` to keep the ordinary failure report on that run.
+If replay passes or fails at a different run, function, or error, no state is
+shown. A failure before any recorded contract call also has no state to show.
+
+Dialers must be deterministic and must not depend on mutable module state;
+replay invokes them again without resetting that state. Matching failure
+identity does not prove identical execution; the displayed state is from the
+replay and may differ from the original. For regression tests, snapshots
+are replayed after all regressions so replay cannot affect later regressions.
+Snapshot errors remain secondary to the original failure. Replay does not save
+another failure.
 
 ### Summary
 
@@ -415,6 +439,7 @@ Rendezvous warns if the config file contains unrecognized keys (e.g. a typo like
 | `--dial=<file>`              | Loads JavaScript dialers from a file for pre/post-processing.                           | `rv root contract test --dial=./custom-dialer.js` |
 | `--config=<file>`            | Uses a JSON config file for all run options.                                            | `rv root contract test --config=rv.config.json`   |
 | `--fail-on-unchecked`        | Exits with code 1 when a test or invariant goes unchecked, or every public call throws. | `rv root contract test --fail-on-unchecked`       |
+| `--snapshot`                 | Reports the contract's data variables before a failure.                                 | `rv root contract test --snapshot`                |
 
 ### Colored Output
 

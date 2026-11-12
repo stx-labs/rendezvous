@@ -18,6 +18,7 @@ export interface PropertyTestConfig {
   radio: EventEmitter;
   eligibleAccounts: Map<string, string>;
   allAddresses: string[];
+  pattern?: string;
 }
 
 /**

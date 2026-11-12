@@ -6,6 +6,7 @@ import { getManifestFileName, main } from "./app";
 import { helpMessage } from "./cli";
 import { red } from "./colors";
 import { getFailureFilePath } from "./persistence";
+import * as persistence from "./persistence";
 import { LOG_DIVIDER } from "./shared";
 import { createIsolatedTestEnvironment } from "./test.utils";
 
@@ -606,6 +607,108 @@ describe("Contract selection", () => {
     vi.restoreAllMocks();
     rmSync(tempDir, { recursive: true, force: true });
   });
+});
+
+describe("Function name patterns", () => {
+  const source = `(define-private (update-context (name (string-ascii 100))
+                                                (calls uint)) (ok true))
+(define-public (increment) (ok true))
+(define-private (test-passes) (ok true))
+(define-private (test-fails) (err u1))
+(define-read-only (invariant-passes) true)
+(define-read-only (invariant-fails) false)
+(define-trait missing ((read () (response uint uint))))
+(define-private (test-missing (target <missing>)) (ok true))
+(define-read-only (invariant-missing (target <missing>)) true)`;
+
+  const run = async (type: string, pattern?: string) => {
+    const tempDir = createIsolatedTestEnvironment(
+      resolve(__dirname, "example"),
+      `${isolatedTestEnvPrefix}pattern-`,
+    );
+    const initialArgv = process.argv;
+    const initialExitCode = process.exitCode;
+    const logs: string[] = [];
+    const persist = vi
+      .spyOn(persistence, "persistFailure")
+      .mockImplementation(() => {});
+    try {
+      writeFileSync(join(tempDir, "contracts/counter.clar"), source);
+      process.argv = [
+        "node",
+        "app.js",
+        tempDir,
+        "counter",
+        type,
+        ...(pattern === undefined ? [] : [pattern]),
+        "--seed=17",
+        "--runs=10",
+        "--bail",
+      ];
+      for (const method of ["log", "info", "error"] as const) {
+        vi.spyOn(console, method).mockImplementation((message: string) => {
+          logs.push(String(message));
+        });
+      }
+      process.exitCode = undefined;
+      await main();
+      return {
+        output: logs.join("\n"),
+        exitCode: process.exitCode,
+        saved: persist.mock.calls.length,
+      };
+    } finally {
+      process.argv = initialArgv;
+      process.exitCode = initialExitCode;
+      vi.restoreAllMocks();
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  };
+
+  it.each([
+    ["test", "absent"],
+    ["test", "missing"],
+    ["invariant", "absent"],
+    ["invariant", "missing"],
+  ])("fails when %s-%s has no executable matches", async (type, name) => {
+    const result = await run(type, `${type}-${name}`);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toMatch(/no executable .*match/i);
+    expect(result.output).toContain(`${type}-${name}`);
+    expect(result.saved).toBe(0);
+  });
+
+  it.each(["test", "invariant"])(
+    "selects only matching %s functions",
+    async (type) => {
+      const result = await run(type, `${type}-passes`);
+      expect(result.output).toMatch(/\[PASS\].*passes/);
+      expect(result.output).not.toMatch(/\[FAIL\]/);
+      expect(result.exitCode).toBeUndefined();
+      expect(result.saved).toBe(0);
+    },
+  );
+
+  it.each(["test", "invariant"])(
+    "does not save a filtered %s failure",
+    async (type) => {
+      const filtered = await run(type, `${type}-fails`);
+      expect(filtered.exitCode).toBe(1);
+      expect(filtered.output).toMatch(/\[FAIL\].*fails/);
+      expect(filtered.output).toMatch(
+        /regression.*not saved|not sav.*regression/i,
+      );
+      expect(filtered.output).toContain("--seed=17");
+      expect(filtered.saved).toBe(0);
+
+      const unpatterned = await run(type);
+      expect(unpatterned.exitCode).toBe(1);
+      expect(unpatterned.saved).toBe(1);
+      expect(unpatterned.output).not.toMatch(
+        /regression.*not saved|not sav.*regression/i,
+      );
+    },
+  );
 });
 
 describe("Custom manifest detection", () => {

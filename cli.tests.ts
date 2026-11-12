@@ -268,4 +268,49 @@ describe("CLI parsing with parseCli", () => {
     const config = parseCli(["./example", "counter", "test", "--seed=42"])!;
     expect(config.warnings).toEqual([]);
   });
+
+  it.each(["test", "invariant"])(
+    "parses an optional %s name pattern",
+    (type) => {
+      expect(parseCli(["./example", "counter", type])!.pattern).toBeUndefined();
+      expect(
+        parseCli([
+          "./example",
+          "counter",
+          type,
+          `${type}-counter-?`,
+          "--seed=42",
+        ])!.pattern,
+      ).toBe(`${type}-counter-?`);
+      expect(parseCli(["./example", "counter", type, ""])!.pattern).toBe("");
+    },
+  );
+
+  it.each(["test", "invariant"])("rejects a %s pattern with --regr", (type) => {
+    expect(() =>
+      parseCli(["./example", "counter", type, `${type}-*`, "--regr"]),
+    ).toThrow(/pattern.*--regr|--regr.*pattern/i);
+  });
+
+  it("checks the effective regression option when a config file is used", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rendezvous-test-pattern-config-"));
+    onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+    const path = join(dir, "rv.config.json");
+    writeFileSync(path, "{}");
+    const config = parseCli([
+      "./example",
+      "counter",
+      "test",
+      "test-*",
+      `--config=${path}`,
+      "--regr",
+    ])!;
+    expect(config.regr).toBe(false);
+    expect(config.warnings.join("\n")).toContain("--regr");
+
+    writeFileSync(path, JSON.stringify({ regr: true }));
+    expect(() =>
+      parseCli(["./example", "counter", "test", "test-*", `--config=${path}`]),
+    ).toThrow(/pattern.*--regr|--regr.*pattern/i);
+  });
 });

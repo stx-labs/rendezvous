@@ -24,6 +24,7 @@ import {
   getContractNameFromContractId,
   getFunctionsListForContract,
   LOG_DIVIDER,
+  matchesPattern,
 } from "./shared";
 import {
   buildTraitReferenceMap,
@@ -63,12 +64,14 @@ export const checkProperties = async (
   radio: EventEmitter,
   eligibleAccounts: Map<string, string>,
   allAddresses: string[],
+  pattern?: string,
 ) => {
   // A map where the keys are the test contract identifiers and the values are
   // arrays of their test functions. This map will be used to access the test
   // functions for each test contract in the property-based testing routine.
   const testContractsTestFunctions = filterTestFunctions(
     rendezvousAllFunctions,
+    pattern,
   );
 
   const rendezvousContractId = rendezvousList[0];
@@ -130,6 +133,18 @@ export const checkProperties = async (
         ),
     ],
   ]);
+
+  if (
+    pattern !== undefined &&
+    executableTestContractsTestFunctions.get(rendezvousContractId)!.length === 0
+  ) {
+    radio.emit(
+      "logFailure",
+      `\nNo executable test functions match "${pattern}" in the "${targetContractName}" contract.\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   // Search for discard functions, for each test function. This map will
   // be used to pair the test functions with their corresponding discard
@@ -275,6 +290,7 @@ export const checkProperties = async (
       radio,
       eligibleAccounts,
       allAddresses,
+      pattern,
       testFunctions,
       testContractsPairedFunctions,
       projectTraitImplementations,
@@ -301,6 +317,7 @@ const propertyTest = async (
     radio,
     eligibleAccounts,
     allAddresses,
+    pattern,
     testFunctions,
     testContractsPairedFunctions,
     projectTraitImplementations,
@@ -340,13 +357,20 @@ const propertyTest = async (
 
     // Persist failures for regression testing.
     if (runDetails.failed) {
-      persistFailure(
-        runDetails,
-        "test",
-        rendezvousContractId,
-        // No dialers in property-based testing.
-        undefined,
-      );
+      if (pattern !== undefined) {
+        radio.emit(
+          "logMessage",
+          `Regression not saved for a filtered failure; repeat the same command with --seed=${runDetails.seed} (with --config, set seed in the config instead).`,
+        );
+      } else {
+        persistFailure(
+          runDetails,
+          "test",
+          rendezvousContractId,
+          // No dialers in property-based testing.
+          undefined,
+        );
+      }
     }
   };
 
@@ -594,12 +618,16 @@ Running ${underline(
 
 const filterTestFunctions = (
   allFunctionsMap: Map<string, ContractInterfaceFunction[]>,
+  pattern: string | undefined,
 ) =>
   new Map(
     Array.from(allFunctionsMap, ([contractId, functions]) => [
       contractId,
       functions.filter(
-        (f) => f.access === "private" && f.name.startsWith("test-"),
+        (f) =>
+          f.access === "private" &&
+          f.name.startsWith("test-") &&
+          (pattern === undefined || matchesPattern(f.name, pattern)),
       ),
     ]),
   );

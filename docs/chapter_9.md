@@ -110,13 +110,13 @@ const arb = strategyFor(simnet, mint, [wallet1]);
 
 | Clarity Type      | Generated As                                     |
 | ----------------- | ------------------------------------------------ |
-| `uint`            | Natural numbers                                  |
-| `int`             | Integers                                         |
+| `uint`            | Full range, 0 to 2^128 - 1                       |
+| `int`             | Full range, -2^127 to 2^127 - 1                  |
 | `bool`            | Booleans                                         |
 | `principal`       | Random address from simnet accounts              |
 | `buff`            | Hex-encoded buffers (respects max length)        |
 | `string-ascii`    | ASCII strings (respects max length)              |
-| `string-utf8`     | UTF-8 strings (respects max length)              |
+| `string-utf8`     | Unicode strings (max length in code points)      |
 | `list`            | Arrays of the element type (recursive)           |
 | `tuple`           | Records with named fields (recursive)            |
 | `optional`        | `none` or `some` of the wrapped type (recursive) |

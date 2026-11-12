@@ -11,6 +11,7 @@ import {
 import fc from "fast-check";
 
 import { dim, green, red, underline, yellow } from "./colors";
+import { observedAsyncProperty } from "./coverage";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
 import { strategyFor } from "./lib";
@@ -350,8 +351,9 @@ const propertyTest = async (
     }
   };
 
+  const asyncProperty = observedAsyncProperty(radio);
   await fc.assert(
-    fc.asyncProperty(
+    asyncProperty(
       fc
         .record({
           rendezvousContractId: fc.constant(rendezvousContractId),

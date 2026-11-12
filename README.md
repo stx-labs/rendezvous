@@ -37,6 +37,8 @@ npm install @stacks/rendezvous
 npx rv <path-to-clarinet-project> <contract-name> <type>
 ```
 
+Ctrl+C stops a run between cases or shrink attempts, normally after a short delay, and exits with code 130. More cases may run before the signal is handled; synchronous SDK calls and event-loop scheduling can add delay. The runner reports partial statistics when available and saves any failure already found. Fatal setup or harness errors take precedence. A second Ctrl+C exits as soon as the signal is handled.
+
 ---
 
 ### Configuration

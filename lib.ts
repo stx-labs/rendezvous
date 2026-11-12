@@ -13,6 +13,7 @@ import {
 } from "./traits";
 import type { ImplementedTraitType } from "./traits.types";
 
+export type { Dialer, DialerContext } from "./dialer.types";
 export type { EnrichedContractInterfaceFunction } from "./shared.types";
 
 /**

@@ -472,6 +472,8 @@ const invariantTest = async (
           try {
             if (dialerRegistry !== undefined) {
               await dialerRegistry.executePreDialers({
+                simnet,
+                contractId: r.rendezvousContractId,
                 selectedFunction,
                 functionCall: undefined,
                 clarityValueArguments: r.selectedFunctionsArgsList[index],
@@ -542,13 +544,27 @@ const invariantTest = async (
               try {
                 if (dialerRegistry !== undefined) {
                   await dialerRegistry.executePostDialers({
+                    simnet,
+                    contractId: r.rendezvousContractId,
                     selectedFunction,
                     functionCall,
                     clarityValueArguments: r.selectedFunctionsArgsList[index],
                   });
                 }
-              } catch (error: any) {
-                throw new PostDialerError(error.message);
+              } catch (error: unknown) {
+                let message = "Unprintable thrown value";
+                try {
+                  const detail =
+                    typeof error === "object" &&
+                    error !== null &&
+                    "message" in error
+                      ? error.message
+                      : undefined;
+                  message = typeof detail === "string" ? detail : String(error);
+                } catch {
+                  message = "Unprintable thrown value";
+                }
+                throw new PostDialerError(message, index);
               }
             } else {
               // Function call failed.

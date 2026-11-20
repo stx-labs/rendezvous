@@ -96,15 +96,17 @@ describe("strategyFor", () => {
 
   it("produces arguments usable with simnet.callPublicFn", async () => {
     const simnet = await initSimnet(manifestPath);
-    const fn = getContractFunction(simnet, "counter", "add");
+    // Unlike `counter.add`, which throws on uint overflow, `update-shipment`
+    // returns a response for any valid arguments.
+    const fn = getContractFunction(simnet, "cargo", "update-shipment");
     const arb = strategyFor(simnet, fn);
 
     fc.assert(
       fc.property(arb, (args: ClarityValue[]) => {
         // Should not throw — arguments are valid Clarity values.
         const { result } = simnet.callPublicFn(
-          `${simnet.deployer}.counter`,
-          "add",
+          `${simnet.deployer}.cargo`,
+          "update-shipment",
           args,
           simnet.deployer,
         );

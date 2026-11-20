@@ -160,12 +160,30 @@ const parameterTypeToArbitrary = (
   }
 };
 
+// `BigInt(...)` rather than `n` literals: the compile target is ES2019.
+/** Smallest Clarity `int` value: -2^127. */
+export const INT128_MIN = -(BigInt(2) ** BigInt(127));
+/** Largest Clarity `int` value: 2^127 - 1. */
+export const INT128_MAX = BigInt(2) ** BigInt(127) - BigInt(1);
+/** Largest Clarity `uint` value: 2^128 - 1. */
+export const UINT128_MAX = BigInt(2) ** BigInt(128) - BigInt(1);
+
+/**
+ * A `bigint` in `[min, max]`. `fc.bigInt` rarely hits the exact bounds, so
+ * they are also drawn directly 1 time in 20.
+ */
+const fullRangeBigInt = (min: bigint, max: bigint): fc.Arbitrary<bigint> =>
+  fc.oneof(
+    { arbitrary: fc.bigInt({ min, max }), weight: 19 },
+    { arbitrary: fc.constantFrom(min, max), weight: 1 },
+  );
+
 /**
  * Base types to fast-check arbitraries mapping.
  */
 const baseTypesToArbitrary: BaseTypesToArbitrary = {
-  int128: fc.integer(),
-  uint128: fc.nat(),
+  int128: fullRangeBigInt(INT128_MIN, INT128_MAX),
+  uint128: fullRangeBigInt(BigInt(0), UINT128_MAX),
   bool: fc.boolean(),
   principal: (addresses: string[]) => fc.constantFrom(...addresses),
 };
@@ -182,10 +200,13 @@ const complexTypesToArbitrary: ComplexTypesToArbitrary = {
   buffer: (length: number) => hexaString({ maxLength: 2 * length }),
   "string-ascii": (length: number) =>
     fc.string({
-      unit: fc.constantFrom(...charSet),
+      unit: asciiChar,
       maxLength: length,
     }),
-  "string-utf8": (length: number) => fc.string({ maxLength: length }),
+  // Clarity measures `string-utf8` length in code points, and each unit is
+  // exactly one code point.
+  "string-utf8": (length: number) =>
+    fc.string({ unit: utf8CodePoint, maxLength: length }),
   list: (
     type: EnrichedParameterType,
     length: number,
@@ -284,6 +305,19 @@ export const hexaString = (
 const charSet =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
 
+const asciiChar = fc.constantFrom(...charSet);
+
+/**
+ * A single code point for `string-utf8`: printable ASCII (the shrink target),
+ * printable non-ASCII, or any code point. Never a lone surrogate, which UTF-8
+ * encoding would silently replace with U+FFFD.
+ */
+const utf8CodePoint: fc.Arbitrary<string> = fc.oneof(
+  asciiChar,
+  fc.string({ unit: "grapheme-composite", minLength: 1, maxLength: 1 }),
+  fc.string({ unit: "binary", minLength: 1, maxLength: 1 }),
+);
+
 /**
  * Converts JavaScript generated function arguments to Clarity values.
  * @param functionInterface The function interface.
@@ -312,10 +346,10 @@ const argToCV = (
     // Base type.
     switch (type) {
       case "int128": {
-        return baseTypesToCV.int128(generatedArgument as number);
+        return baseTypesToCV.int128(generatedArgument as bigint);
       }
       case "uint128": {
-        return baseTypesToCV.uint128(generatedArgument as number);
+        return baseTypesToCV.uint128(generatedArgument as bigint);
       }
       case "bool": {
         return baseTypesToCV.bool(generatedArgument as boolean);
@@ -374,8 +408,8 @@ const argToCV = (
  * Base types to Clarity values mapping.
  */
 const baseTypesToCV: BaseTypesToCV = {
-  int128: (arg: number) => Cl.int(arg),
-  uint128: (arg: number) => Cl.uint(arg),
+  int128: (arg: bigint) => Cl.int(arg),
+  uint128: (arg: bigint) => Cl.uint(arg),
   bool: (arg: boolean) => Cl.bool(arg),
   principal: (arg: string) => Cl.principal(arg),
 };
@@ -406,6 +440,34 @@ const complexTypesToCV: ComplexTypesToCV = {
 
 const isBaseType = (type: EnrichedParameterType): type is EnrichedBaseType =>
   ["int128", "uint128", "bool", "principal"].includes(type as EnrichedBaseType);
+
+/**
+ * Code points that are invisible or would corrupt terminal output: controls
+ * other than newline (e.g. ESC, CR, C1), format characters (e.g. zero-width
+ * space), private-use code points, and line/paragraph separators.
+ */
+const nonPrintableCodePoint = /(?!\n)[\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]/gu;
+
+/**
+ * Escapes non-printable code points as `\u{...}`, keeping newlines.
+ * @param text The text to log.
+ * @returns The printable text.
+ */
+export const escapeNonPrintable = (text: string): string =>
+  text.replace(
+    nonPrintableCodePoint,
+    (c) => `\\u{${c.codePointAt(0)!.toString(16)}}`,
+  );
+
+/**
+ * Formats a Clarity value for logging: `Cl.stringify` (which escapes quotes,
+ * backslashes and C0 controls) with any remaining non-printable code points
+ * escaped, e.g. `u"\u{80}"`.
+ * @param cv The Clarity value.
+ * @returns The printable string representation.
+ */
+export const printCV = (cv: ClarityValue): string =>
+  escapeNonPrintable(Cl.stringify(cv));
 
 export const getContractNameFromContractId = (contractId: string): string =>
   contractId.split(".")[1];

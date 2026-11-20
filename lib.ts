@@ -3,7 +3,7 @@ import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import type { ClarityValue } from "@stacks/transactions";
 import fc from "fast-check";
 
-import { argsToCV, functionToArbitrary } from "./shared";
+import { functionToArbitrary } from "./shared";
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
 import {
   buildTraitReferenceMap,
@@ -134,7 +134,5 @@ export const strategyFor = (
     return fc.constant([]);
   }
 
-  return fc
-    .tuple(...arbitraries)
-    .map((generated: unknown[]) => argsToCV(fn, generated));
+  return fc.tuple(...arbitraries);
 };

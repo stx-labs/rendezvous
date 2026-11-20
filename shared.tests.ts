@@ -2,14 +2,25 @@ import { rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
+import {
+  Cl,
+  cvToString,
+  type ClarityValue,
+  type TupleCV,
+} from "@stacks/transactions";
 import fc from "fast-check";
 
 import {
+  functionToArbitrary,
   getContractNameFromContractId,
   getFunctionsFromContractInterfaces,
   getFunctionsListForContract,
   getSimnetDeployerContractsInterfaces,
 } from "./shared";
+import type {
+  EnrichedContractInterfaceFunction,
+  EnrichedParameterType,
+} from "./shared.types";
 import { createIsolatedTestEnvironment } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-shared-";
@@ -122,5 +133,75 @@ describe("Contract identifier parsing", () => {
         },
       ),
     );
+  });
+});
+
+describe("Argument generation", () => {
+  const arbitrariesFor = (...types: EnrichedParameterType[]) =>
+    functionToArbitrary(
+      {
+        name: "f",
+        access: "public",
+        outputs: { type: "bool" },
+        args: types.map((type, i) => ({ name: `arg${i}`, type })),
+      } as EnrichedContractInterfaceFunction,
+      [],
+      {},
+    );
+
+  it.each<[EnrichedParameterType, ClarityValue]>([
+    ["bool", Cl.some(Cl.bool(false))],
+    ["uint128", Cl.some(Cl.uint(0))],
+    [{ "string-ascii": { length: 3 } }, Cl.some(Cl.stringAscii(""))],
+    [{ buffer: { length: 3 } }, Cl.some(Cl.bufferFromHex(""))],
+    [{ optional: "bool" }, Cl.some(Cl.none())],
+  ])("generates (some <falsy>) for optional %j", (inner, expected) => {
+    const [arbitrary] = arbitrariesFor({ optional: inner });
+    const generated = fc.sample(arbitrary, { seed: 1, numRuns: 2000 });
+
+    expect(generated).toContainEqual(expected);
+    expect(generated).toContainEqual(Cl.none());
+  });
+
+  it("generates tuples with a regular prototype", () => {
+    const [arbitrary] = arbitrariesFor({
+      tuple: [{ name: "a", type: "bool" }],
+    });
+    const generated = fc.sample(arbitrary, { seed: 1, numRuns: 200 });
+
+    generated.forEach((cv) => {
+      expect(Object.getPrototypeOf((cv as TupleCV).value)).toBe(
+        Object.prototype,
+      );
+    });
+  });
+
+  // These literals were generated before the argument arbitraries mapped
+  // straight to Clarity values. If this test fails, seeds saved in
+  // `.rendezvous-regressions` now replay to different arguments: call that
+  // out as a user-visible change instead of refreshing the values.
+  it("generates the same values for a fixed seed", () => {
+    const arbitraries = arbitrariesFor(
+      {
+        tuple: [
+          { name: "a", type: "bool" },
+          { name: "b", type: "int128" },
+        ],
+      },
+      { response: { ok: "uint128", error: { "string-ascii": { length: 3 } } } },
+      "uint128",
+    );
+
+    const generated = fc.sample(fc.tuple(...arbitraries), {
+      seed: 42,
+      numRuns: 4,
+    });
+
+    expect(generated.map((args) => args.map((cv) => cvToString(cv)))).toEqual([
+      ["(tuple (a false) (b -2))", "(ok u15541234)", "u1077723492"],
+      ["(tuple (a true) (b 2147483646))", "(ok u23)", "u1605711835"],
+      ["(tuple (a true) (b -11))", '(err "A")', "u21"],
+      ["(tuple (a false) (b 2147483626))", '(err "Q")', "u30"],
+    ]);
   });
 });

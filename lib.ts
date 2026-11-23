@@ -134,5 +134,8 @@ export const strategyFor = (
     return fc.constant([]);
   }
 
-  return fc.tuple(...arbitraries);
+  // While shrinking, fast-check hands the unchanged arguments back as the same
+  // objects. Copy them so in-place edits (e.g. by a pre-dialer) do not leak
+  // into later runs. `.map` draws no randomness, so saved seeds still replay.
+  return fc.tuple(...arbitraries).map((args) => structuredClone(args));
 };

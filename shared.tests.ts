@@ -6,6 +6,7 @@ import {
   Cl,
   cvToString,
   type ClarityValue,
+  type ListCV,
   type TupleCV,
 } from "@stacks/transactions";
 import fc from "fast-check";
@@ -161,6 +162,19 @@ describe("Argument generation", () => {
 
     expect(generated).toContainEqual(expected);
     expect(generated).toContainEqual(Cl.none());
+  });
+
+  it("generates a distinct object for each none", () => {
+    const [arbitrary] = arbitrariesFor({
+      list: { type: { optional: "bool" }, length: 8 },
+    });
+    const nones = fc
+      .sample(arbitrary, { seed: 1, numRuns: 200 })
+      .flatMap((cv) => (cv as ListCV).value)
+      .filter((cv) => cv.type === "none");
+
+    expect(nones.length).toBeGreaterThan(1);
+    expect(new Set(nones).size).toBe(nones.length);
   });
 
   it("generates tuples with a regular prototype", () => {

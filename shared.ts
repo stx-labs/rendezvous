@@ -213,14 +213,18 @@ const complexTypesToArbitrary = {
     addresses: string[],
     projectTraitImplementations: Record<string, ImplementedTraitType[]>,
   ) =>
-    fc.option(
-      parameterTypeToArbitrary(
-        type,
-        addresses,
-        projectTraitImplementations,
-      ).map(Cl.some),
-      { nil: Cl.none() },
-    ),
+    // Map the `null` sentinel afterwards instead of passing `nil: Cl.none()`:
+    // `nil` would hand out one shared object, so a pre-dialer mutating one
+    // `none` argument would change every other generated `none`.
+    fc
+      .option(
+        parameterTypeToArbitrary(
+          type,
+          addresses,
+          projectTraitImplementations,
+        ).map(Cl.some),
+      )
+      .map((value) => value ?? Cl.none()),
   response: (
     okType: EnrichedParameterType,
     errType: EnrichedParameterType,

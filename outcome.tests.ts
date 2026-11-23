@@ -28,6 +28,7 @@ const run = async (
   type: "test" | "invariant" = "test",
   bail = true,
   regr = false,
+  dialSource?: string,
 ) => {
   const directory = mkdtempSync(join(tmpdir(), "rendezvous-test-outcome-"));
   mkdirSync(join(directory, "settings"));
@@ -55,6 +56,10 @@ mnemonic = "${
 balance = 100000000000000
 `,
   );
+  const dialPath = dialSource && join(directory, "dialer.mjs");
+  if (dialPath) {
+    writeFileSync(dialPath, dialSource);
+  }
   const logs: string[] = [];
   const radio = new EventEmitter();
   for (const event of ["logMessage", "logFailure", "logInfo"]) {
@@ -64,10 +69,20 @@ balance = 100000000000000
   radio.on("unchecked", () => unchecked++);
   process.exitCode = 0;
   // Keep failing runs from writing regression files to the working directory.
+  const saveFailure = persistence.persistFailure;
+  const readFailures = persistence.loadFailures;
   const persist = vi
     .spyOn(persistence, "persistFailure")
     .mockImplementation(() => {});
   persist.mockClear();
+  if (dialPath) {
+    persist.mockImplementation((details, kind, id, dial) =>
+      saveFailure(details, kind, id, dial, { baseDir: directory }),
+    );
+    vi.spyOn(persistence, "loadFailures").mockImplementation((id, kind) =>
+      readFailures(id, kind, { baseDir: directory }),
+    );
+  }
   const manifestPath = join(directory, "Clarinet.toml");
   try {
     const simnet = await initSimnet(manifestPath);
@@ -80,6 +95,21 @@ balance = 100000000000000
     const resetSession = async () => {
       await initSimnet(manifestPath);
     };
+    const runInvariant = (regression: boolean) =>
+      checkInvariants(
+        simnet,
+        resetSession,
+        [contractId],
+        functions,
+        17,
+        20,
+        dialPath,
+        bail,
+        regression,
+        radio,
+        accounts,
+        [simnet.deployer],
+      );
     if (type === "test") {
       await checkProperties(
         simnet,
@@ -95,24 +125,28 @@ balance = 100000000000000
         [simnet.deployer],
       );
     } else {
-      await checkInvariants(
-        simnet,
-        resetSession,
-        [contractId],
-        functions,
-        17,
-        20,
-        undefined,
-        bail,
-        regr,
-        radio,
-        accounts,
-        [simnet.deployer],
-      );
+      await runInvariant(regr);
+    }
+    const firstLogs = stripVTControlCharacters(logs.join("\n"));
+    const firstExit = process.exitCode;
+    const records = dialPath
+      ? persistence.loadFailures(contractId, "invariant")
+      : [];
+    let replayLogs = "";
+    let replayExit: unknown = undefined;
+    if (records.length) {
+      logs.length = 0;
+      process.exitCode = 0;
+      await runInvariant(true);
+      replayLogs = stripVTControlCharacters(logs.join("\n"));
+      replayExit = process.exitCode;
     }
     return {
-      logs: stripVTControlCharacters(logs.join("\n")),
-      exitCode: process.exitCode,
+      records,
+      replayLogs,
+      replayExit,
+      logs: firstLogs,
+      exitCode: firstExit,
       paths: persist.mock.calls.map(([details]) => details.counterexamplePath),
       unchecked,
     };
@@ -230,6 +264,86 @@ const context = `(define-map context (string-ascii 100) uint)
   (ok (map-set context name calls)))`;
 
 describe("Invariant testing outcomes", () => {
+  it("reports and replays an outside-in failure", async () => {
+    const result = await run(
+      `${context}
+(define-data-var total uint u0)
+(define-public (touch (n uint)) (begin (var-set total (+ (var-get total) u1)) (ok n)))
+(define-read-only (invariant-pass) true)`,
+      "invariant",
+      false,
+      false,
+      `export const postCheck = ({ simnet, contractId, functionCall }) => {
+        if (!functionCall || !contractId.endsWith(".fixture")) throw Error("bad context");
+        const value = simnet.getDataVar(contractId, "total");
+        if (value.value >= 1n) throw Error("outside balance failure");
+      };`,
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.logs).toContain("Post-dialer failed");
+    expect(result.logs).toContain("outside balance failure");
+    expect(result.logs).not.toContain("- Invariant: invariant-pass");
+    expect(result.logs).toMatch(/- Functions: touch \(public\)/);
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0]).toMatchObject({
+      seed: 17,
+      dial: expect.stringContaining("dialer.mjs"),
+      counterexamplePath: expect.any(String),
+    });
+    expect(result.replayExit).toBe(1);
+    expect(result.replayLogs).toContain("outside balance failure");
+    const sequence = (logs: string) =>
+      logs.match(/- Functions:.*\n- Arguments:.*\n- Callers  :.*/)?.[0];
+    expect(sequence(result.replayLogs)).toEqual(sequence(result.logs));
+  });
+
+  it.each([
+    ["null", "null"],
+    ["undefined", "undefined"],
+    ['"bad balance"', "bad balance"],
+    ['({ message: "balance mismatch" })', "balance mismatch"],
+    [
+      '({ get message() { throw Error("nested"); } })',
+      "Unprintable thrown value",
+    ],
+    ['({ toString() { throw Error("nested"); } })', "Unprintable thrown value"],
+  ])("reports and saves a post-dialer throwing %s", async (thrown, message) => {
+    const result = await run(
+      `${context} (define-public (touch) (ok true)) (define-read-only (invariant-pass) true)`,
+      "invariant",
+      true,
+      false,
+      `export const postCheck = () => { throw ${thrown}; };`,
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.logs).toContain("Post-dialer failed");
+    expect(result.logs).toContain(message);
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0]).toMatchObject({
+      seed: 17,
+      dial: expect.stringContaining("dialer.mjs"),
+    });
+    expect(result.replayExit).toBe(1);
+    expect(result.replayLogs).toContain(message);
+  });
+
+  it("preserves passing outcomes with a post-dialer", async () => {
+    const source = `${context} (define-data-var total uint u0) (define-public (touch) (begin (var-set total (+ u1 (var-get total))) (ok true))) (define-read-only (invariant-pass) true)`;
+    const plain = await run(source, "invariant");
+    const withDial = await run(
+      source,
+      "invariant",
+      true,
+      false,
+      `let previous = 0n;
+export const preCheck = ({ simnet, contractId, functionCall }) => { if (!contractId.endsWith(".fixture") || functionCall !== undefined || simnet.getDataVar(contractId, "total").value !== previous) throw Error("bad pre context or reset state"); };
+export const postCheck = ({ simnet, contractId, functionCall }) => { if (!functionCall) throw Error("bad post context"); previous = simnet.getDataVar(contractId, "total").value; };`,
+    );
+    expect(withDial.exitCode).toBe(plain.exitCode);
+    expect(withDial.logs).toContain("OK, invariants passed after 20 runs.");
+    expect(withDial.records).toHaveLength(0);
+  });
+
   it.each(
     withAndWithoutBail([
       ["a false result", "(define-read-only (invariant-fail) false)"],

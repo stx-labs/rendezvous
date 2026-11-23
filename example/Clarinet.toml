@@ -44,6 +44,11 @@ path = 'contracts/cargo.clar'
 clarity_version = 3
 epoch = 3.0
 
+[contracts.balances]
+path = 'contracts/balances.clar'
+clarity_version = 3
+epoch = 3.0
+
 [contracts.counter]
 path = 'contracts/counter.clar'
 clarity_version = 3

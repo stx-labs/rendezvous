@@ -79,8 +79,11 @@ export class PreDialerError extends Error {
 }
 
 export class PostDialerError extends Error {
-  constructor(message: string) {
+  readonly callIndex: number;
+
+  constructor(message: string, callIndex: number) {
     super(message);
+    this.callIndex = callIndex;
     this.name = "Post-dialer error";
   }
 }

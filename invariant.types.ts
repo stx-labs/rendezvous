@@ -32,6 +32,7 @@ export interface InvariantTestConfig {
   radio: EventEmitter;
   eligibleAccounts: Map<string, string>;
   allAddresses: string[];
+  pattern?: string;
 }
 
 /**

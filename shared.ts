@@ -407,5 +407,38 @@ const complexTypesToCV: ComplexTypesToCV = {
 const isBaseType = (type: EnrichedParameterType): type is EnrichedBaseType =>
   ["int128", "uint128", "bool", "principal"].includes(type as EnrichedBaseType);
 
+/** Matches a whole name using * and ? wildcards and backslash escapes. */
+export const matchesPattern = (name: string, pattern: string): boolean => {
+  const chars = [...name];
+  const tokens = [...pattern];
+  let i = 0;
+  let j = 0;
+  let star = -1;
+  let retry = 0;
+
+  while (i < chars.length) {
+    if (tokens[j] === "*") {
+      star = j++;
+      retry = i;
+    } else {
+      const escaped = tokens[j] === "\\" && j + 1 < tokens.length;
+      const char = tokens[j + (escaped ? 1 : 0)];
+      if (char === chars[i] || (!escaped && char === "?")) {
+        i++;
+        j += escaped ? 2 : 1;
+      } else if (star !== -1) {
+        j = star + 1;
+        i = ++retry;
+      } else {
+        return false;
+      }
+    }
+  }
+  while (tokens[j] === "*") {
+    j++;
+  }
+  return j === tokens.length;
+};
+
 export const getContractNameFromContractId = (contractId: string): string =>
   contractId.split(".")[1];

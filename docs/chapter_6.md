@@ -208,13 +208,17 @@ In that file, you’ll find a **post-dialer** designed as a **sanity check** for
 During **invariant testing**, Rendezvous picks up dialers when executing public function calls:
 
 - **Pre-dialers** run **before** each public function call.
-- **Post-dialers** run **after** each public function call.
+- **Post-dialers** run after a call returns, including `(err ...)`. They do not
+  run if the call throws or a successful call's `update-context` fails.
 
 Both have access to an object containing:
 
 - `selectedFunction` – The function being executed.
 - `functionCall` – The result of the function call (`undefined` for **pre-dialers**).
 - `clarityValueArguments` – The generated Clarity values used as arguments.
+
+Existing post-dialers that require committed events or state should guard against
+error responses, as in the example below.
 
 **Example: Post-Dialer for SIP-010**
 
@@ -226,6 +230,9 @@ async function postTransferSip010PrintEvent(context) {
 
   // Ensure this check runs only for the "transfer" function.
   if (selectedFunction.name !== "transfer") return;
+
+  // Error responses roll back events.
+  if (functionCall.result.type !== "ok") return;
 
   const functionCallEvents = functionCall.events;
   const memoParameterIndex = 3; // The memo parameter is the fourth argument.

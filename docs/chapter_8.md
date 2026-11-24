@@ -116,14 +116,25 @@ Using this command, Rendezvous will **randomly execute public function calls** i
 Another way to detect the introduced bug is by writing this property-based test:
 
 ```clarity
+(define-constant MAX_UINT u340282366920938463463374607431768211455)
+
 (define-private (test-increment)
   (let
     (
       (counter-before (get-counter))
     )
-    (unwrap-panic (increment))
-    (asserts! (is-eq (get-counter) (+ counter-before u1)) (err u404))
-    (ok true)
+    (ok
+      (if
+        ;; Discard the test if incrementing the counter would overflow it.
+        (is-eq counter-before MAX_UINT)
+        false
+        (begin
+          (unwrap-panic (increment))
+          (asserts! (is-eq (get-counter) (+ counter-before u1)) (err u404))
+          true
+        )
+      )
+    )
   )
 )
 ```
@@ -137,8 +148,9 @@ If the test fails, it means the counter did not increment as expected, revealing
 #### Test logic
 
 1. Record the counter value before calling `increment`.
-2. Call `increment` and ensure it does not fail.
-3. Check that the new counter value equals the previous value +1.
+2. Discard the test if the counter is already at the maximum `uint`, which other tests such as `test-add` can reach.
+3. Call `increment` and ensure it does not fail.
+4. Check that the new counter value equals the previous value +1.
    - If this condition does not hold, the test fails with error `u404`.
    - This catches unexpected changes, such as the counter resetting.
 

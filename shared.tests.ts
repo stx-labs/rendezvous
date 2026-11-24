@@ -180,7 +180,41 @@ describe("Argument generation", () => {
     expect(
       values.filter((v) => v >= -1000 && v <= 1000).length,
     ).toBeGreaterThan(100);
+    // Every magnitude in between is covered, not only the two extremes.
+    const magnitudes = values.map((v) => (v < 0 ? -v : v));
+    for (const [low, high] of [
+      [10, 20],
+      [20, 32],
+      [32, 48],
+      [48, 64],
+      [64, 100],
+      [100, 127],
+    ]) {
+      expect(
+        magnitudes.filter(
+          (m) => m >= BigInt(2) ** BigInt(low) && m < BigInt(2) ** BigInt(high),
+        ).length,
+      ).toBeGreaterThan(50);
+    }
   });
+
+  it.each([
+    ["int128", (v: bigint) => v >= BigInt(-5), BigInt(-6)] as const,
+    ["int128", (v: bigint) => v <= BigInt(1000), BigInt(1001)] as const,
+    ["uint128", (v: bigint) => v < BigInt(1000), BigInt(1000)] as const,
+  ])(
+    "shrinks a failing %s to the smallest counterexample",
+    (type, holds, smallest) => {
+      // Covers failures first found on an exact bound, 1 value in 20.
+      for (let seed = 0; seed < 200; seed++) {
+        const details = fc.check(fc.property(arbitraryFor(type), holds), {
+          seed,
+        });
+        expect(details.failed).toBe(true);
+        expect(details.counterexample).toEqual([smallest]);
+      }
+    },
+  );
 
   it("generates single ASCII, BMP and astral code points for string-utf8", () => {
     const values = fc.sample(
@@ -253,6 +287,28 @@ describe("Clarity value printing", () => {
 
   it("leaves printable values unchanged", () => {
     expect(printCV(Cl.stringUtf8("héllo 中文 🛋"))).toBe('u"héllo 中文 🛋"');
+    // A combining mark on a base character, here a decomposed "é".
+    expect(printCV(Cl.stringUtf8("he\u0301llo"))).toBe('u"he\u0301llo"');
+  });
+
+  it("escapes combining marks that have no base character", () => {
+    expect(printCV(Cl.stringUtf8("\u0301a\u0301 \u0301"))).toBe(
+      'u"\\u{301}a\u0301 \\u{301}"',
+    );
+    // A mark after an escaped code point would render on the escape itself.
+    expect(printCV(Cl.stringUtf8("a\u200b\u0301\u0302"))).toBe(
+      'u"a\\u{200b}\\u{301}\\u{302}"',
+    );
+  });
+
+  it("escapes non-ASCII spaces, ignorable and unassigned code points", () => {
+    expect(printCV(Cl.stringUtf8("a b\u00a0\u3000"))).toBe(
+      'u"a b\\u{a0}\\u{3000}"',
+    );
+    expect(printCV(Cl.stringUtf8("\u2764\ufe0f\u3164"))).toBe(
+      'u"\u2764\\u{fe0f}\\u{3164}"',
+    );
+    expect(printCV(Cl.stringUtf8("\u0378\uffff"))).toBe('u"\\u{378}\\u{ffff}"');
   });
 
   it("escapes raw control characters in free text but keeps newlines", () => {

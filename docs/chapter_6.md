@@ -554,8 +554,13 @@ A **separate function** determines whether a test should run.
 **Discard function example**
 
 ```clarity
+(define-constant MAX_UINT u340282366920938463463374607431768211455)
+
 (define-read-only (can-test-add (n uint))
-  (> n u1)  ;; Only allow tests where n > 1
+  (and
+    (> n u1)  ;; Only allow tests where n > 1...
+    (<= n (- MAX_UINT (get-counter)))  ;; ...and the counter cannot overflow.
+  )
 )
 
 (define-private (test-add (n uint))
@@ -568,7 +573,9 @@ A **separate function** determines whether a test should run.
 )
 ```
 
-Here, `can-test-add` ensures that the test **never executes** for `n <= 1`.
+Here, `can-test-add` ensures that the test **never executes** for `n <= 1`, or for an `n` that would overflow the counter.
+
+> Rendezvous generates `uint` and `int` arguments across their full 128-bit range. Arithmetic on them can overflow, and an overflow is a runtime error that fails the test. Discard the inputs your function cannot accept.
 
 ### In-Place Discarding
 
@@ -582,7 +589,8 @@ Instead of using a separate function, **the test itself decides whether to run**
     ((counter-before (get-counter)))
     (ok
       (if
-        (<= n u1)  ;; If n <= 1, discard the test.
+        ;; If n <= 1, or adding n would overflow the counter, discard the test.
+        (or (<= n u1) (> n (- MAX_UINT counter-before)))
         false
         (begin
           (try! (add n))
@@ -595,7 +603,7 @@ Instead of using a separate function, **the test itself decides whether to run**
 )
 ```
 
-In this case, if `n <= 1`, the test **discards itself** by returning `(ok false)`, skipping execution.
+In this case, if `n <= 1` or adding `n` would overflow the counter, the test **discards itself** by returning `(ok false)`, skipping execution.
 
 ### Discarding summary
 

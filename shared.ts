@@ -169,21 +169,73 @@ export const INT128_MAX = BigInt(2) ** BigInt(127) - BigInt(1);
 export const UINT128_MAX = BigInt(2) ** BigInt(128) - BigInt(1);
 
 /**
- * A `bigint` in `[min, max]`. `fc.bigInt` rarely hits the exact bounds, so
- * they are also drawn directly 1 time in 20.
+ * A `bigint` in `[0, 2^maxBits - 1]` whose bit width is drawn first, so every
+ * magnitude is equally likely. `fc.bigInt` alone is uniform over the range,
+ * which almost never yields a value below 2^100.
  */
-const fullRangeBigInt = (min: bigint, max: bigint): fc.Arbitrary<bigint> =>
-  fc.oneof(
-    { arbitrary: fc.bigInt({ min, max }), weight: 19 },
-    { arbitrary: fc.constantFrom(min, max), weight: 1 },
-  );
+const magnitude = (maxBits: number): fc.Arbitrary<bigint> =>
+  fc
+    .tuple(
+      fc.integer({ min: 0, max: maxBits }),
+      fc.noBias(
+        fc.bigInt({
+          min: BigInt(0),
+          max: BigInt(2) ** BigInt(maxBits) - BigInt(1),
+        }),
+      ),
+    )
+    .map(([bits, raw]) => raw >> BigInt(maxBits - bits));
+
+/**
+ * A `bigint` in `[min, max]` that generates with `source` and shrinks like
+ * `fc.bigInt`: on the value itself, toward 0. Shrinking through `source`
+ * instead would depend on how the value was drawn, and an exact bound would
+ * not shrink at all.
+ */
+class FullRangeBigIntArbitrary extends fc.Arbitrary<bigint> {
+  private readonly source: fc.Arbitrary<bigint>;
+  private readonly shrinker: fc.Arbitrary<bigint>;
+
+  constructor(source: fc.Arbitrary<bigint>, min: bigint, max: bigint) {
+    super();
+    // `fc.bigInt` rarely hits the exact bounds, and neither does `source`, so
+    // they are also drawn directly 1 time in 20.
+    this.source = fc.oneof(
+      { arbitrary: source, weight: 19 },
+      { arbitrary: fc.constantFrom(min, max), weight: 1 },
+    );
+    this.shrinker = fc.bigInt({ min, max });
+  }
+
+  generate(mrng: fc.Random, biasFactor: number | undefined): fc.Value<bigint> {
+    // No context: the shrinker then starts from the value alone.
+    return new fc.Value(
+      this.source.generate(mrng, biasFactor).value,
+      undefined,
+    );
+  }
+
+  canShrinkWithoutContext(value: unknown): value is bigint {
+    return this.shrinker.canShrinkWithoutContext(value);
+  }
+
+  shrink(value: bigint, context: unknown): fc.Stream<fc.Value<bigint>> {
+    return this.shrinker.shrink(value, context);
+  }
+}
 
 /**
  * Base types to fast-check arbitraries mapping.
  */
 const baseTypesToArbitrary: BaseTypesToArbitrary = {
-  int128: fullRangeBigInt(INT128_MIN, INT128_MAX),
-  uint128: fullRangeBigInt(BigInt(0), UINT128_MAX),
+  int128: new FullRangeBigIntArbitrary(
+    fc
+      .tuple(fc.boolean(), magnitude(127))
+      .map(([negative, m]) => (negative ? -m - BigInt(1) : m)),
+    INT128_MIN,
+    INT128_MAX,
+  ),
+  uint128: new FullRangeBigIntArbitrary(magnitude(128), BigInt(0), UINT128_MAX),
   bool: fc.boolean(),
   principal: (addresses: string[]) => fc.constantFrom(...addresses),
 };
@@ -443,21 +495,48 @@ const isBaseType = (type: EnrichedParameterType): type is EnrichedBaseType =>
 
 /**
  * Code points that are invisible or would corrupt terminal output: controls
- * other than newline (e.g. ESC, CR, C1), format characters (e.g. zero-width
- * space), private-use code points, and line/paragraph separators.
+ * (e.g. ESC, CR, C1), format characters (e.g. zero-width space), private-use,
+ * unassigned and surrogate code points, separators other than the ASCII space
+ * (e.g. no-break space, line separator), and default-ignorable code points
+ * (e.g. variation selectors, Hangul fillers).
  */
-const nonPrintableCodePoint = /(?!\n)[\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]/gu;
+const invisibleCodePoint = /[\p{C}\p{Z}\p{Default_Ignorable_Code_Point}]/u;
+
+/** A combining mark, which is only legible on top of a base character. */
+const combiningMark = /\p{M}/u;
+
+/** A visible character that a following combining mark can attach to. */
+const baseCharacter = /[\p{L}\p{N}\p{S}\p{M}]/u;
+
+/** Cheap pre-check: anything `escapeNonPrintable` could have to escape. */
+const mayNeedEscaping =
+  /(?![\n ])[\p{C}\p{Z}\p{M}\p{Default_Ignorable_Code_Point}]/u;
 
 /**
- * Escapes non-printable code points as `\u{...}`, keeping newlines.
+ * Escapes non-printable code points as `\u{...}`, keeping newlines and ASCII
+ * spaces. A combining mark is kept only when it follows a visible base
+ * character; otherwise it would render on top of a quote or an escape.
  * @param text The text to log.
  * @returns The printable text.
  */
-export const escapeNonPrintable = (text: string): string =>
-  text.replace(
-    nonPrintableCodePoint,
-    (c) => `\\u{${c.codePointAt(0)!.toString(16)}}`,
-  );
+export const escapeNonPrintable = (text: string): string => {
+  if (!mayNeedEscaping.test(text)) {
+    return text;
+  }
+
+  let printable = "";
+  let afterBaseCharacter = false;
+  for (const c of text) {
+    const escaped: boolean =
+      c !== "\n" &&
+      c !== " " &&
+      (invisibleCodePoint.test(c) ||
+        (combiningMark.test(c) && !afterBaseCharacter));
+    printable += escaped ? `\\u{${c.codePointAt(0)!.toString(16)}}` : c;
+    afterBaseCharacter = !escaped && baseCharacter.test(c);
+  }
+  return printable;
+};
 
 /**
  * Formats a Clarity value for logging: `Cl.stringify` (which escapes quotes,

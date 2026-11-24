@@ -138,6 +138,21 @@ describe("Contract identifier parsing", () => {
 });
 
 describe("Argument generation", () => {
+  const addresses = [
+    "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
+    "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+    "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG",
+  ];
+  const traitIdentifier = { issuer: [1], name: "traits" };
+  const ftTrait = { name: "ft-trait", contract_identifier: traitIdentifier };
+  const traitImplementations = {
+    [`${addresses[0]}.token-a`]: [ftTrait],
+    [`${addresses[0]}.token-b`]: [ftTrait],
+    [`${addresses[0]}.other`]: [
+      { name: "nft-trait", contract_identifier: traitIdentifier },
+    ],
+  };
+
   const arbitrariesFor = (...types: EnrichedParameterType[]) =>
     functionToArbitrary(
       {
@@ -146,9 +161,14 @@ describe("Argument generation", () => {
         outputs: { type: "bool" },
         args: types.map((type, i) => ({ name: `arg${i}`, type })),
       } as EnrichedContractInterfaceFunction,
-      [],
-      {},
+      addresses,
+      traitImplementations,
     );
+
+  const sampleAsStrings = (types: EnrichedParameterType[]) =>
+    fc
+      .sample(fc.tuple(...arbitrariesFor(...types)), { seed: 42, numRuns: 4 })
+      .map((args) => args.map((cv) => cvToString(cv)));
 
   it.each<[EnrichedParameterType, ClarityValue]>([
     ["bool", Cl.some(Cl.bool(false))],
@@ -194,28 +214,71 @@ describe("Argument generation", () => {
   // straight to Clarity values. If this test fails, seeds saved in
   // `.rendezvous-regressions` now replay to different arguments: call that
   // out as a user-visible change instead of refreshing the values.
-  it("generates the same values for a fixed seed", () => {
-    const arbitraries = arbitrariesFor(
-      {
-        tuple: [
-          { name: "a", type: "bool" },
-          { name: "b", type: "int128" },
-        ],
-      },
-      { response: { ok: "uint128", error: { "string-ascii": { length: 3 } } } },
-      "uint128",
-    );
+  it.each<[string, EnrichedParameterType[], string[][]]>([
+    [
+      "tuples, responses and integers",
+      [
+        {
+          tuple: [
+            { name: "a", type: "bool" },
+            { name: "b", type: "int128" },
+          ],
+        },
+        {
+          response: { ok: "uint128", error: { "string-ascii": { length: 3 } } },
+        },
+        "uint128",
+      ],
+      [
+        ["(tuple (a false) (b -2))", "(ok u15541234)", "u1077723492"],
+        ["(tuple (a true) (b 2147483646))", "(ok u23)", "u1605711835"],
+        ["(tuple (a true) (b -11))", '(err "A")', "u21"],
+        ["(tuple (a false) (b 2147483626))", '(err "Q")', "u30"],
+      ],
+    ],
+    [
+      "lists, buffers, utf8 strings, principals and trait references",
+      [
+        { list: { type: { buffer: { length: 2 } }, length: 3 } },
+        { "string-utf8": { length: 4 } },
+        "principal",
+        {
+          trait_reference: {
+            name: "token",
+            import: { Imported: ftTrait },
+          },
+        },
+      ],
+      [
+        ["(list )", 'u"LZy"', addresses[0], `${addresses[0]}.token-b`],
+        ["(list 0x 0x98)", 'u"$"', addresses[2], `${addresses[0]}.token-b`],
+        ["(list )", 'u""', addresses[1], `${addresses[0]}.token-b`],
+        ["(list )", 'u""', addresses[1], `${addresses[0]}.token-a`],
+      ],
+    ],
+  ])("generates the same %s for a fixed seed", (_, types, expected) => {
+    expect(sampleAsStrings(types)).toEqual(expected);
+  });
 
-    const generated = fc.sample(fc.tuple(...arbitraries), {
-      seed: 42,
-      numRuns: 4,
-    });
-
-    expect(generated.map((args) => args.map((cv) => cvToString(cv)))).toEqual([
-      ["(tuple (a false) (b -2))", "(ok u15541234)", "u1077723492"],
-      ["(tuple (a true) (b 2147483646))", "(ok u23)", "u1605711835"],
-      ["(tuple (a true) (b -11))", '(err "A")', "u21"],
-      ["(tuple (a false) (b 2147483626))", '(err "Q")', "u30"],
+  // Unlike the literals above, these were generated after falsy optionals
+  // became reachable: before that, every `(some false)` and `(some "")` below
+  // came out as `none`. They guard later changes the same way.
+  it("generates the same optionals for a fixed seed", () => {
+    expect(
+      sampleAsStrings([
+        { optional: "bool" },
+        { optional: { "string-ascii": { length: 2 } } },
+        { list: { type: { optional: "uint128" }, length: 3 } },
+      ]),
+    ).toEqual([
+      ["(some false)", '(some "")', "(list none (some u8))"],
+      ["(some false)", '(some "d")', "(list )"],
+      [
+        "(some false)",
+        "none",
+        "(list (some u2047405135) (some u21) (some u10))",
+      ],
+      ["none", "none", "(list (some u1789811753))"],
     ]);
   });
 });

@@ -162,8 +162,8 @@ const baseTypesToArbitrary = {
  */
 const complexTypesToArbitrary = {
   // For buffer types, the length must be doubled because they are represented
-  // in hex, as `Cl.bufferFromHex` expects. The UInt8Array will have half the length of the corresponding
-  // hex string. Stacks.js reference:
+  // in hex, as `Cl.bufferFromHex` expects. The UInt8Array will have half the
+  // length of the corresponding hex string. Stacks.js reference:
   // https://github.com/stx-labs/stacks.js/blob/fd0bf26b5f29fc3c1bf79581d0ad9b89f0d7f15a/packages/common/src/utils.ts#L522
   buffer: (length: number) =>
     hexaString({ maxLength: 2 * length }).map(Cl.bufferFromHex),
@@ -232,7 +232,8 @@ const complexTypesToArbitrary = {
     projectTraitImplementations: Record<string, ImplementedTraitType[]>,
   ) =>
     // Each branch keeps a single-key `fc.record` because `fc.record` draws one
-    // boolean per value, and saved regression seeds depend on that draw.
+    // boolean per generated record (to pick its prototype), and saved
+    // regression seeds depend on that draw.
     fc.oneof(
       fc
         .record({

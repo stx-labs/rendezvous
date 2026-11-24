@@ -130,12 +130,12 @@ export const strategyFor = (
     resolvedTraitImplementations,
   );
 
-  if (arbitraries.length === 0) {
-    return fc.constant([]);
-  }
-
   // While shrinking, fast-check hands the unchanged arguments back as the same
-  // objects. Copy them so in-place edits (e.g. by a pre-dialer) do not leak
-  // into later runs. `.map` draws no randomness, so saved seeds still replay.
+  // objects. Copy them so a property that edits its arguments in place does
+  // not see those edits in later runs. This only holds when the strategy is
+  // the property's own arbitrary: nested in `fc.tuple` or `fc.record`,
+  // fast-check reuses the copy while it shrinks the other entries, so such
+  // callers must copy the arguments themselves. `.map` draws no randomness, so
+  // saved seeds still replay.
   return fc.tuple(...arbitraries).map((args) => structuredClone(args));
 };

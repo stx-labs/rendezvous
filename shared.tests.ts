@@ -196,6 +196,10 @@ describe("Argument generation", () => {
         ).length,
       ).toBeGreaterThan(50);
     }
+    // Most values fit in 64 bits, where realistic amounts live.
+    expect(magnitudes.filter((m) => m < beyond64Bits).length).toBeGreaterThan(
+      1_200,
+    );
   });
 
   it.each([

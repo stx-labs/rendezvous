@@ -170,13 +170,17 @@ export const UINT128_MAX = BigInt(2) ** BigInt(128) - BigInt(1);
 
 /**
  * A `bigint` in `[0, 2^maxBits - 1]` whose bit width is drawn first, so every
- * magnitude is equally likely. `fc.bigInt` alone is uniform over the range,
- * which almost never yields a value below 2^100.
+ * magnitude is covered. `fc.bigInt` alone is uniform over the range, which
+ * almost never yields a value below 2^100. Half the widths are capped at 64
+ * bits, where realistic amounts live (the STX supply in uSTX fits in 51).
  */
 const magnitude = (maxBits: number): fc.Arbitrary<bigint> =>
   fc
     .tuple(
-      fc.integer({ min: 0, max: maxBits }),
+      fc.oneof(
+        fc.integer({ min: 0, max: Math.min(64, maxBits) }),
+        fc.integer({ min: 0, max: maxBits }),
+      ),
       fc.noBias(
         fc.bigInt({
           min: BigInt(0),

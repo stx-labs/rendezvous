@@ -1,5 +1,5 @@
 import { rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 import type {
@@ -15,7 +15,7 @@ import {
   isReturnTypeBoolean,
   isTestDiscardedInPlace,
 } from "../src/property";
-import { createIsolatedTestEnvironment } from "./test.utils";
+import { createIsolatedTestEnvironment, exampleDir } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-property-";
 
@@ -218,7 +218,7 @@ describe("Test discarding related operations", () => {
   it("in place discard function returns true if the function call result is (ok false)", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -251,7 +251,7 @@ describe("Test discarding related operations", () => {
   it("in place discard function returns false if the function call result is (ok true)", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");

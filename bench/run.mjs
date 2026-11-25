@@ -86,7 +86,7 @@ if (!existsSync(appPath)) {
 // Warn when a source file changed after the last build, since the benchmark
 // would otherwise silently measure the old code.
 const builtAt = statSync(appPath).mtimeMs;
-const staleSources = readdirSync(srcDir).filter(
+const staleSources = readdirSync(srcDir, { recursive: true }).filter(
   (file) =>
     file.endsWith(".ts") && statSync(join(srcDir, file)).mtimeMs > builtAt,
 );

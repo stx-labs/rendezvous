@@ -1,5 +1,5 @@
 import { rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 import type {
@@ -17,7 +17,7 @@ import {
   isTraitReferenceFunction,
 } from "../src/traits";
 import type { ImplementedTraitType } from "../src/traits.types";
-import { createIsolatedTestEnvironment } from "./test.utils";
+import { createIsolatedTestEnvironment, exampleDir } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-traits-";
 
@@ -2299,7 +2299,7 @@ describe("Trait reference processing", () => {
   it("correctly retrieves the contracts implementing an imported trait from the Clarinet project", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
@@ -2346,7 +2346,7 @@ describe("Trait reference processing", () => {
   it("correctly retrieves empty array when no corresponding trait implementations are found", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
@@ -2389,7 +2389,7 @@ describe("Trait reference processing", () => {
   it("correctly retrieves the contracts implementing a defined trait from the Clarinet project", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));

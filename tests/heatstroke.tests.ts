@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
@@ -11,7 +11,7 @@ import { reporter, trackFailureStatistics } from "../src/heatstroke";
 import { FalsifiedInvariantError } from "../src/invariant";
 import { PropertyTestError } from "../src/property";
 import { getContractNameFromContractId, printCV } from "../src/shared";
-import { createIsolatedTestEnvironment } from "./test.utils";
+import { createIsolatedTestEnvironment, exampleDir } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-heatstroke-";
 
@@ -47,7 +47,7 @@ describe("Custom reporter logging", () => {
   it("handles cases with missing path on failure for invariant testing type", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -204,7 +204,7 @@ describe("Custom reporter logging", () => {
   it("handles cases with a specified path on failure for invariant testing type", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -366,7 +366,7 @@ describe("Custom reporter logging", () => {
   it("does not log anything on success for invariant testing type", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -483,7 +483,7 @@ describe("Custom reporter logging", () => {
   it("handles cases with missing path on failure for property testing type", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -592,7 +592,7 @@ describe("Custom reporter logging", () => {
   it("handles cases with a specified path on failure for property testing type", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -705,7 +705,7 @@ describe("Custom reporter logging", () => {
   it("does not log anything on success for property testing type", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");

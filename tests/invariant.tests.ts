@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 import { Cl } from "@stacks/transactions";
@@ -16,7 +16,7 @@ import {
   getFunctionsFromContractInterfaces,
   getSimnetDeployerContractsInterfaces,
 } from "../src/shared";
-import { createIsolatedTestEnvironment } from "./test.utils";
+import { createIsolatedTestEnvironment, exampleDir } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-invariant-";
 
@@ -24,7 +24,7 @@ describe("Simnet contracts operations", () => {
   it("correctly initializes the local context for a given contract and functions", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -54,7 +54,7 @@ describe("Simnet contracts operations", () => {
   it("correctly initializes the Clarity context", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
@@ -114,7 +114,7 @@ describe("Custom dialers", () => {
   it("executes the pre-dialers from the very first SUT call", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "..", "example"),
+      exampleDir,
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));

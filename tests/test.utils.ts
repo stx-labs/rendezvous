@@ -1,6 +1,9 @@
 import { cpSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+
+/** The absolute path to the example Clarinet project the tests run against. */
+export const exampleDir = resolve(__dirname, "..", "example");
 
 /**
  * Creates an isolated test environment by copying the Clarinet project to a

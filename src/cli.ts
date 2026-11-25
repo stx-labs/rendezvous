@@ -12,10 +12,10 @@ import {
 import { LOG_DIVIDER } from "./shared";
 
 /**
- * The package version, read at runtime: a static `import` of `package.json`
- * would make tsc copy it into `dist/`. This module runs as TypeScript from
- * `src/` (tests) and as JavaScript from `dist/` once built, both one level
- * below the package root.
+ * The package version, read at runtime rather than imported: `package.json`
+ * sits outside `rootDir`, so it stays out of the compiled program. This module
+ * runs as TypeScript from `src/` (tests) and as JavaScript from `dist/` once
+ * built, both one level below the package root.
  */
 const { version } = JSON.parse(
   readFileSync(join(__dirname, "..", "package.json"), "utf8"),

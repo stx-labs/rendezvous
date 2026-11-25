@@ -268,4 +268,29 @@ describe("CLI parsing with parseCli", () => {
     const config = parseCli(["./example", "counter", "test", "--seed=42"])!;
     expect(config.warnings).toEqual([]);
   });
+
+  it("keeps snapshots disabled unless --snapshot is passed", () => {
+    expect(parseCli(["./example", "counter", "test"])!.snapshot).toBe(false);
+    expect(
+      parseCli(["./example", "counter", "test", "--snapshot"])!.snapshot,
+    ).toBe(true);
+  });
+
+  it("takes snapshot only from the config when --config is provided", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "rv-cli-snapshot-"));
+    const configPath = join(tempDir, "rv.config.json");
+    const argv = ["./example", "counter", "test", `--config=${configPath}`];
+    try {
+      writeFileSync(configPath, JSON.stringify({ snapshot: true }));
+      expect(parseCli(argv)!.snapshot).toBe(true);
+      writeFileSync(configPath, "{}");
+      const ignored = parseCli([...argv, "--snapshot"])!;
+      expect(ignored.snapshot).toBe(false);
+      expect(ignored.warnings).toEqual([
+        "Warning: --snapshot ignored when --config is used.",
+      ]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

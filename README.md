@@ -66,6 +66,13 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
   throws; these only warn by default.
 - `--dial` – The path to a JavaScript file containing custom pre- and
   post-execution functions (dialers).
+- `--snapshot` – After a failure, report the target contract's data variables
+  before each call of the failing run (opt-in).
+
+After a failure, Rendezvous resets simnet and replays the seed without
+shrinking. Only the target contract's data variables are shown. Dialers
+must be deterministic and must not depend on mutable module state. Set
+`"snapshot": true` in config.
 
 ---
 

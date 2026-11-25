@@ -1,0 +1,517 @@
+import { EventEmitter } from "node:events";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { stripVTControlCharacters } from "node:util";
+
+import type { Simnet } from "@stacks/clarinet-sdk";
+import { Cl } from "@stacks/transactions";
+import fc from "fast-check";
+
+import { main } from "./app";
+import type { RunDetails } from "./heatstroke.types";
+import { reportStateBeforeFailure, StateRecorder } from "./snapshot";
+
+vi.mock("fast-check", async (importOriginal) => {
+  const actual = await importOriginal<{ default: typeof fc }>();
+  return { ...actual, default: { ...actual.default } };
+});
+
+const isolatedTestEnvPrefix = "rendezvous-test-snapshot-";
+
+const fakeSimnet = () =>
+  ({
+    blockHeight: 3,
+    burnBlockHeight: 2,
+    getContractsInterfaces: () =>
+      new Map([
+        [
+          "ST1.contract",
+          {
+            variables: [
+              { name: "counter", access: "variable" },
+              { name: "limit", access: "constant" },
+            ],
+          },
+        ],
+      ]),
+    getDataVar: vi.fn(() => Cl.uint(7)),
+  }) as unknown as Simnet & { getDataVar: ReturnType<typeof vi.fn> };
+
+const failedRun = (numRuns: number) =>
+  ({
+    failed: true,
+    numRuns,
+    seed: 1,
+    counterexample: [],
+    firstFailure: { functionName: "test-a", message: "error" },
+  }) as RunDetails;
+
+describe("State recorder", () => {
+  it("records the data variables of the target run only", () => {
+    // Arrange
+    const simnet = fakeSimnet();
+    const recorder = new StateRecorder(2);
+
+    // Act
+    recorder.startRun();
+    recorder.record(simnet, "ST1.contract", "test-a");
+    recorder.startRun();
+    recorder.record(simnet, "ST1.contract", "test-b");
+    recorder.startRun();
+    recorder.record(simnet, "ST1.contract", "test-c");
+
+    // Assert
+    expect(simnet.getDataVar).toHaveBeenCalledTimes(1);
+    expect(recorder.snapshots).toEqual([
+      {
+        functionName: "test-b",
+        burnBlockHeight: 2,
+        blockHeight: 3,
+        dataVariables: [["counter", "u7"]],
+      },
+    ]);
+  });
+
+  it("keeps a read error instead of throwing it", () => {
+    // Arrange
+    const simnet = fakeSimnet();
+    simnet.getDataVar.mockImplementation(() => {
+      throw new Error("read failed");
+    });
+    const recorder = new StateRecorder(1);
+    recorder.startRun();
+
+    // Act & Assert
+    expect(() =>
+      recorder.record(simnet, "ST1.contract", "test-a"),
+    ).not.toThrow();
+    expect(recorder.error).toEqual(new Error("read failed"));
+  });
+});
+
+describe("Reporting the state before a failure", () => {
+  const captureLogs = () => {
+    const logs: string[] = [];
+    const radio = new EventEmitter();
+    radio.on("logMessage", (log) => logs.push(log));
+    radio.on("logFailure", (log) => logs.push(log));
+    return { logs, radio };
+  };
+
+  it("does not replay a passing run", async () => {
+    // Arrange
+    const { logs, radio } = captureLogs();
+    const resetSession = vi.fn(async () => {});
+    const replay = vi.fn();
+
+    // Act
+    await reportStateBeforeFailure(
+      { ...failedRun(100), failed: false },
+      "ST1.contract",
+      resetSession,
+      replay,
+      radio,
+    );
+
+    // Assert
+    expect(resetSession).not.toHaveBeenCalled();
+    expect(replay).not.toHaveBeenCalled();
+    expect(logs).toEqual([]);
+  });
+
+  it("reports no state when the replay fails at another run", async () => {
+    // Arrange
+    const { logs, radio } = captureLogs();
+
+    // Act
+    await reportStateBeforeFailure(
+      failedRun(3),
+      "ST1.contract",
+      async () => {},
+      async (_radio, recorder) => {
+        recorder.startRun();
+        recorder.record(fakeSimnet(), "ST1.contract", "test-a");
+        return failedRun(1);
+      },
+      radio,
+    );
+
+    // Assert
+    expect(logs).toContain(
+      "The snapshot could not be reproduced (for example, due to a nondeterministic dialer), so no state is reported.\n",
+    );
+    expect(logs.some((log) => log.includes("counter: u7"))).toBe(false);
+  });
+
+  it.each([
+    { functionName: "other", message: "error" },
+    { functionName: "test-a", message: "different error" },
+  ])(
+    "rejects a different failure at the same run: %o",
+    async (firstFailure) => {
+      const { logs, radio } = captureLogs();
+      await reportStateBeforeFailure(
+        failedRun(1),
+        "ST1.contract",
+        async () => {},
+        async (_radio, recorder) => {
+          recorder.startRun();
+          recorder.record(fakeSimnet(), "ST1.contract", "test-a");
+          return { ...failedRun(1), firstFailure };
+        },
+        radio,
+      );
+      expect(logs.join("\n")).toContain("snapshot could not be reproduced");
+      expect(logs.join("\n")).not.toContain("counter: u7");
+    },
+  );
+
+  it.each(["reset", "replay"])(
+    "keeps a snapshot %s rejection secondary",
+    async (operation) => {
+      const { logs, radio } = captureLogs();
+      const failure = new Error(`${operation} failed`);
+      const reject = vi.fn(async () => {
+        throw failure;
+      });
+      await expect(
+        reportStateBeforeFailure(
+          failedRun(1),
+          "ST1.contract",
+          operation === "reset" ? reject : async () => {},
+          reject,
+          radio,
+        ),
+      ).resolves.toBeUndefined();
+      expect(logs).toContain(
+        `Could not replay the failure for a state snapshot: ${failure}\n`,
+      );
+      expect(logs.join("\n")).not.toContain(
+        "Replayed contract state before each call",
+      );
+      expect(reject).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("reports when the failure happens before a recorded contract call", async () => {
+    const { logs, radio } = captureLogs();
+    await reportStateBeforeFailure(
+      failedRun(1),
+      "ST1.contract",
+      async () => {},
+      async () => failedRun(1),
+      radio,
+    );
+    expect(logs).toContain(
+      "No contract call was recorded during the failing run, so no state is reported.\n",
+    );
+    expect(logs.join("\n")).not.toContain(
+      "Replayed contract state before each call",
+    );
+  });
+
+  it("reports a read error instead of the state", async () => {
+    // Arrange
+    const { logs, radio } = captureLogs();
+    const simnet = fakeSimnet();
+    simnet.getDataVar.mockImplementation(() => {
+      throw new Error("read failed");
+    });
+
+    // Act
+    await reportStateBeforeFailure(
+      failedRun(1),
+      "ST1.contract",
+      async () => {},
+      async (_radio, recorder) => {
+        recorder.startRun();
+        recorder.record(simnet, "ST1.contract", "test-a");
+        return failedRun(1);
+      },
+      radio,
+    );
+
+    // Assert
+    expect(logs).toContain(
+      "Could not read the contract state: Error: read failed\n",
+    );
+  });
+});
+
+describe("--snapshot in the CLI", () => {
+  const initialArgv = process.argv;
+  const initialCwd = process.cwd();
+  const initialExitCode = process.exitCode;
+  let project = "";
+  let logs: string[] = [];
+
+  const run = async (args: string[]) => {
+    logs = [];
+    for (const method of ["log", "error"] as const) {
+      vi.spyOn(console, method).mockImplementation((message: string) => {
+        logs.push(stripVTControlCharacters(String(message)));
+      });
+    }
+    process.argv = ["node", "app.js", project, "counter", ...args];
+    await main();
+    vi.restoreAllMocks();
+    return logs.join("\n");
+  };
+
+  beforeEach(() => {
+    project = mkdtempSync(join(tmpdir(), isolatedTestEnvPrefix));
+    mkdirSync(join(project, "contracts"));
+    cpSync(
+      resolve(__dirname, "example", "settings"),
+      join(project, "settings"),
+      { recursive: true },
+    );
+    writeFileSync(
+      join(project, "Clarinet.toml"),
+      `[project]
+name = "snapshot"
+telemetry = false
+
+[contracts.counter]
+path = "contracts/counter.clar"
+clarity_version = 3
+epoch = 3.0
+`,
+    );
+    // The property and the invariant both fail once the counter reaches 5.
+    writeFileSync(
+      join(project, "contracts", "counter.clar"),
+      `(define-data-var counter uint u0)
+(define-data-var flag bool false)
+(define-constant LIMIT u5)
+
+(define-map context (string-ascii 100) { called: uint })
+
+(define-private (update-context (function-name (string-ascii 100))
+    (called uint))
+  (ok (map-set context function-name { called: called })))
+
+(define-public (increment)
+  (ok (var-set counter (+ (var-get counter) u1))))
+
+(define-read-only (invariant-below-limit) (< (var-get counter) LIMIT))
+
+(define-private (test-below-limit)
+  (begin
+    (var-set counter (+ (var-get counter) u1))
+    (asserts! (< (var-get counter) LIMIT) (err u1))
+    (ok true)))
+`,
+    );
+    // Keep saved regressions inside the temporary project.
+    process.chdir(project);
+  });
+
+  afterEach(() => {
+    process.chdir(initialCwd);
+    process.argv = initialArgv;
+    process.exitCode = initialExitCode;
+    vi.restoreAllMocks();
+    rmSync(project, { recursive: true, force: true });
+  });
+
+  it.each(["test", "invariant"])(
+    "replays the generated failure seed for %s",
+    async (type) => {
+      const seeds: number[] = [];
+      const requested: (number | undefined)[] = [];
+      const originalAssert = fc.assert;
+      vi.spyOn(fc, "assert").mockImplementation(async (property, options) => {
+        requested.push(options?.seed);
+        await originalAssert(property, {
+          ...options,
+          asyncReporter: async (details) => {
+            seeds.push(details.seed);
+            await options!.reporter!(details);
+          },
+          reporter: undefined,
+        });
+      });
+
+      const output = await run([type, "--runs=10", "--bail", "--snapshot"]);
+
+      expect(requested).toEqual([undefined, seeds[0]]);
+      expect(seeds).toEqual([seeds[0], seeds[0]]);
+      expect(output).toContain("contract state before each call");
+      expect(process.exitCode).toBe(1);
+    },
+  );
+
+  it("reports the state before the failing property call", async () => {
+    // Act
+    const output = await run(["test", "--seed=1", "--snapshot"]);
+
+    // Assert: the fifth call fails, after four passing ones.
+    expect(output).toContain("Error: Property failed after 5 tests.");
+    expect(output).toContain(
+      "Replaying seed 1 up to run 5 to report the state before the first " +
+        "failure...",
+    );
+    expect(output).toContain(
+      "contract state before each call of run 5, the first failing run " +
+        "(counter data variables only):",
+    );
+    expect(output).toMatch(
+      /before test-below-limit\n {2}counter: u4\n {2}flag: false/,
+    );
+    expect(output).not.toContain("LIMIT");
+    expect(process.exitCode).toBe(1);
+    // The replay does not save the failure again.
+    const regressions = JSON.parse(
+      readFileSync(
+        join(
+          project,
+          ".rendezvous-regressions",
+          "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter.json",
+        ),
+        "utf8",
+      ),
+    );
+    expect(regressions.test).toHaveLength(1);
+  });
+
+  it("reports state when a discard function throws", async () => {
+    writeFileSync(
+      join(project, "contracts", "counter.clar"),
+      `(define-data-var counter uint u7)
+(define-read-only (can-test-example) (is-eq (/ u1 u0) u1))
+(define-private (test-example) (ok true))
+`,
+    );
+
+    const output = await run(["test", "--seed=1", "--bail", "--snapshot"]);
+
+    expect(output).toMatch(/before can-test-example\n {2}counter: u7/);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("reports state before calls in the failing invariant run", async () => {
+    // Act
+    const output = await run(["invariant", "--seed=1", "--snapshot"]);
+
+    // Assert
+    const states = [
+      ...output.matchAll(/before (\S+)\n {2}counter: u(\d+)/g),
+    ].map(([, functionName, counter]) => ({
+      functionName,
+      counter: Number(counter),
+    }));
+    expect(states.length).toBeGreaterThan(1);
+    // The run starts below the limit and each increment adds one.
+    expect(states[0].counter).toBeLessThan(5);
+    states.forEach(({ functionName, counter }, index) => {
+      expect(functionName).toBe(
+        index < states.length - 1 ? "increment" : "invariant-below-limit",
+      );
+      expect(counter).toBe(states[0].counter + index);
+    });
+    expect(states[states.length - 1].counter).toBeGreaterThanOrEqual(5);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("suppresses snapshots when a stateful dialer changes the failure", async () => {
+    const dialer = join(project, "dialer.cjs");
+    writeFileSync(
+      dialer,
+      'let calls = 0; exports.postOnce = () => { if (++calls === 1) throw new Error("first post failure"); };',
+    );
+
+    const output = await run([
+      "invariant",
+      "--seed=17",
+      "--runs=100",
+      "--bail",
+      `--dial=${dialer}`,
+      "--snapshot",
+    ]);
+
+    expect(output).toContain("first post failure");
+    expect(output).toContain("snapshot could not be reproduced");
+    expect(output).not.toContain("contract state before each call");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("runs all invariant regressions before replaying snapshots", async () => {
+    const directory = join(project, ".rendezvous-regressions");
+    mkdirSync(directory);
+    writeFileSync(
+      join(directory, "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter.json"),
+      JSON.stringify({
+        invariant: [
+          { seed: 1, numRuns: 10, timestamp: 2 },
+          { seed: 2, numRuns: 10, timestamp: 1 },
+        ],
+      }),
+    );
+
+    const output = await run(["invariant", "--regr", "--snapshot"]);
+
+    const firstReplay = output.indexOf("Replaying seed");
+    expect(firstReplay).toBeGreaterThan(0);
+    expect(
+      output.slice(0, firstReplay).match(/Error: Property failed/g),
+    ).toHaveLength(2);
+    expect(output.slice(firstReplay).match(/Replaying seed/g)).toHaveLength(2);
+  });
+
+  it("does not replay an invariant context update error", async () => {
+    writeFileSync(
+      join(project, "contracts", "counter.clar"),
+      `(define-data-var counter uint u0)
+(define-private (update-context (name (string-ascii 100)) (called uint))
+  (if (is-eq called u0) (ok true) (err u1)))
+(define-public (increment) (ok (var-set counter (+ (var-get counter) u1))))
+(define-read-only (invariant-passes) true)
+`,
+    );
+
+    const output = await run(["invariant", "--seed=1", "--snapshot"]);
+
+    expect(output).toContain("Could not update the context");
+    expect(output).not.toContain("Replaying seed");
+    expect(output).not.toContain("Replayed contract state before each call");
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("does not replay or report state for a passing run", async () => {
+    // Arrange
+    writeFileSync(
+      join(project, "contracts", "counter.clar"),
+      `(define-data-var counter uint u0)
+
+(define-private (test-passes) (ok true))
+`,
+    );
+
+    // Act
+    const output = await run(["test", "--seed=1", "--runs=10", "--snapshot"]);
+
+    // Assert
+    expect(output).toContain("OK, properties passed after 10 runs.");
+    expect(output).not.toContain("Replaying");
+    expect(output).not.toContain("Replayed contract state before each call");
+  });
+
+  it("does not report state without --snapshot", async () => {
+    // Act
+    const output = await run(["test", "--seed=1"]);
+
+    // Assert
+    expect(output).toContain("Error: Property failed after 5 tests.");
+    expect(output).not.toContain("Replaying");
+    expect(output).not.toContain("Replayed contract state before each call");
+  });
+});

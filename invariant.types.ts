@@ -3,6 +3,7 @@ import type { EventEmitter } from "node:events";
 import type { Simnet } from "@stacks/clarinet-sdk";
 
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
+import type { StateRecorder } from "./snapshot";
 import type { ImplementedTraitType } from "./traits.types";
 
 type ContractId = string;
@@ -32,6 +33,8 @@ export interface InvariantTestConfig {
   radio: EventEmitter;
   eligibleAccounts: Map<string, string>;
   allAddresses: string[];
+  /** Records the contract state when replaying a failure. */
+  recorder?: StateRecorder;
 }
 
 /**

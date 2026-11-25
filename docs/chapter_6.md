@@ -584,6 +584,8 @@ Instead of using a separate function, **the test itself decides whether to run**
 **In-place discarding example**
 
 ```clarity
+(define-constant MAX_UINT u340282366920938463463374607431768211455)
+
 (define-private (test-add (n uint))
   (let
     ((counter-before (get-counter)))

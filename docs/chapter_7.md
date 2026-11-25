@@ -388,29 +388,37 @@ Let's address them one by one.
 ;; The new loan amount should equal the old loan amount plus the borrowed
 ;; amount.
 (define-private (test-borrow (amount uint))
-  (if (or
-      ;; If amount is 0, the STX transfer performed in the borrow operation
-      ;; would fail, resulting in a false negative.
-      (is-eq amount u0)
-      ;; If the amount to borrow would exceed the allowed limit defined in the
-      ;; borrow function, the borrow operation would fail, resulting in a false
-      ;; negative.
-      (> (+ (default-to u0 (get amount (map-get? loans tx-sender))) amount)
+  (let (
+      (initial-loan (default-to u0 (get amount (map-get? loans tx-sender))))
+      (allowed-borrow
         (/ (default-to u0 (get amount (map-get? deposits { owner: tx-sender })))
           u2
         ))
     )
-    ;; Discard the test if preconditions aren't met.
-    (ok false)
-    ;; Run the test.
-    (let ((initial-loan (default-to u0 (get amount (map-get? loans tx-sender)))))
-      (unwrap! (borrow amount) (err "Borrow call failed"))
-      (let ((updated-loan (default-to u0 (get amount (map-get? loans tx-sender)))))
-        ;; Verify the property: new loan = old loan + borrowed amount
-        (asserts! (is-eq updated-loan (+ initial-loan amount))
-          (err "Loan amount not updated correctly")
+    (if (or
+        ;; If amount is 0, the STX transfer performed in the borrow operation
+        ;; would fail, resulting in a false negative.
+        (is-eq amount u0)
+        ;; If the amount to borrow would exceed the allowed limit defined in
+        ;; the borrow function, the borrow operation would fail, resulting in
+        ;; a false negative. The amount is compared against what is left to
+        ;; borrow, rather than added to the loan: Rendezvous generates amounts
+        ;; up to the maximum uint, and that addition would overflow.
+        (> initial-loan allowed-borrow)
+        (> amount (- allowed-borrow initial-loan))
+      )
+      ;; Discard the test if preconditions aren't met.
+      (ok false)
+      ;; Run the test.
+      (begin
+        (unwrap! (borrow amount) (err "Borrow call failed"))
+        (let ((updated-loan (default-to u0 (get amount (map-get? loans tx-sender)))))
+          ;; Verify the property: new loan = old loan + borrowed amount
+          (asserts! (is-eq updated-loan (+ initial-loan amount))
+            (err "Loan amount not updated correctly")
+          )
+          (ok true)
         )
-        (ok true)
       )
     )
   )
@@ -418,6 +426,8 @@ Let's address them one by one.
 ```
 
 The test discards invalid cases: when `amount` is `u0`, or when the new total loan would exceed half the deposit (which also covers cases with no deposits).
+
+> Rendezvous generates `uint` arguments across their full 128-bit range. An arithmetic overflow in a test is a runtime error, which Rendezvous reports as a failure, so the discard check avoids adding `amount` to anything before it is known to be small enough.
 
 > Now the test only runs when valid preconditions are met.
 
@@ -503,6 +513,8 @@ LEGEND:
 ```
 
 The output shows a failure: `(err "Loan amount not updated correctly")`. The contract isn't tracking loan amounts correctly.
+
+> **Note:** Each run uses a different random sequence. If all 100 runs pass, run the command again or raise the number of runs, e.g. `npx rv . stx-defi test --runs=300`.
 
 > **Note:** The output includes a seed (`1880056597`) you can use to reproduce this exact sequence.
 

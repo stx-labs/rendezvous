@@ -10,6 +10,11 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    # @stacks/clarinet-sdk depends on an exact @stacks/transactions version.
+    # Bump ours by hand to the version clarinet-sdk uses, so a single copy is
+    # installed.
+    ignore:
+      - dependency-name: "@stacks/transactions"
     # PR titles become squash commit subjects; keep them conventional.
     commit-message:
       prefix: chore

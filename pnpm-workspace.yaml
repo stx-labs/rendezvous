@@ -18,8 +18,9 @@ trustPolicy: no-downgrade
 # dependency (such as @stacks/clarinet-sdk) does not support.
 engineStrict: true
 
-# Adopted on release day (2026-11-25). Pinned to the exact version so later
-# releases wait out the release age again; remove this list after 2026-11-30.
+# clarinet 4.1.0 was adopted on its release day (2026-11-25), ahead of the 5-day
+# minimum. Exact versions, so later releases still wait; delete this list after
+# 2026-11-30.
 minimumReleaseAgeExclude:
   - "@stacks/clarinet-sdk@4.1.0"
   - "@stacks/clarinet-sdk-wasm@4.1.0"

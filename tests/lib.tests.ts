@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 import {
@@ -9,9 +9,10 @@ import {
 } from "@stacks/transactions";
 import fc from "fast-check";
 
-import { getContractFunction, strategyFor } from "./lib";
+import { getContractFunction, strategyFor } from "../src/lib";
+import { exampleDir } from "./test.utils";
 
-const manifestPath = join(resolve(__dirname, "example"), "Clarinet.toml");
+const manifestPath = join(exampleDir, "Clarinet.toml");
 
 describe("getContractFunction", () => {
   it("returns the function interface for a known contract and function", async () => {

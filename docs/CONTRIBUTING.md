@@ -39,7 +39,7 @@ To keep things simple and to maintain quality, please follow these guidelines.
    ```
 
 4. **Write tests:**
-   Test your changes. Add or update tests in `*.tests.ts` files.
+   Test your changes. Add or update tests in `tests/*.tests.ts` files.
    Run tests:
 
    ```

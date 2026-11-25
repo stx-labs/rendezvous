@@ -2,14 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    "rootDir": "./src",
     "types": ["node"]
   },
-  "exclude": [
-    "*.tests.*",
-    "test.utils.ts",
-    "*.config.ts",
-    "vitest.setup.ts",
-    "dist",
-    "example"
-  ]
+  "include": ["src"]
 }

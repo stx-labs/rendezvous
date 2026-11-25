@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 
-import { red, underline } from "./colors";
+import { red, underline } from "../src/colors";
 
 const terminal = Object.assign(new PassThrough(), { isTTY: true });
 const pipe = new PassThrough();

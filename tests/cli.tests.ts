@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { parseCli } from "./cli";
+import { parseCli } from "../src/cli";
 
 describe("CLI parsing with parseCli", () => {
   it("returns undefined when --help is passed", () => {

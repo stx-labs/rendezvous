@@ -50,15 +50,15 @@
     "@stacks/clarinet-sdk": "^4.1.0",
     "@stacks/clarinet-sdk-wasm": "^4.1.0",
     "@stacks/transactions": "^7.6.0",
-    "fast-check": "^4.10.2"
+    "fast-check": "^4.10.3"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
     "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "^5.0.5",
-    "oxlint": "^1.90.0",
-    "prettier": "^3.9.10",
+    "@vitest/coverage-v8": "^5.1.1",
+    "oxlint": "^1.94.0",
+    "prettier": "^3.10.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.1"
   }
 }

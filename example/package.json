@@ -13,11 +13,11 @@
   "license": "ISC",
   "dependencies": {
     "@stacks/clarinet-sdk": "^4.1.0",
-    "@stacks/rendezvous": "^1.1.0",
+    "@stacks/rendezvous": "workspace:*",
     "@stacks/transactions": "^7.6.0",
     "@types/node": "^26.6.6",
     "chokidar-cli": "^3.0.0",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.1",
     "vitest-environment-clarinet": "^4.0.0"
   }
 }

@@ -123,21 +123,34 @@ Rendezvous also works as a library for building custom property-based testing st
 ```ts
 import { initSimnet } from "@stacks/clarinet-sdk";
 import { getContractFunction, strategyFor } from "@stacks/rendezvous";
+import type { UIntCV } from "@stacks/transactions";
 import fc from "fast-check";
 
+const MAX_UINT = 2n ** 128n - 1n;
+
 const simnet = await initSimnet("./Clarinet.toml");
+const counter = `${simnet.deployer}.counter`;
 const add = getContractFunction(simnet, "counter", "add");
 const arb = strategyFor(simnet, add);
 
 fc.assert(
   fc.property(arb, (args) => {
+    const n = BigInt((args[0] as UIntCV).value);
+    const before = BigInt(
+      (simnet.getDataVar(counter, "counter") as UIntCV).value,
+    );
+    // The simnet keeps its state between runs. Skip the amounts that would
+    // overflow the counter: that is a runtime error, and the call would throw.
+    fc.pre(n <= MAX_UINT - before);
+
     const { result } = simnet.callPublicFn(
-      `${simnet.deployer}.counter`,
+      counter,
       "add",
       args,
       simnet.deployer,
     );
-    return result.type !== "err";
+    // `add` only accepts amounts greater than 1.
+    return result.type === (n > 1n ? "ok" : "err");
   }),
 );
 ```

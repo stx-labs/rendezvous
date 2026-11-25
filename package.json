@@ -47,8 +47,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@stacks/clarinet-sdk": "^3.26.0",
-    "@stacks/clarinet-sdk-wasm": "^3.26.0",
+    "@stacks/clarinet-sdk": "^4.1.0",
+    "@stacks/clarinet-sdk-wasm": "^4.1.0",
     "@stacks/transactions": "^7.6.0",
     "fast-check": "^4.10.2"
   },

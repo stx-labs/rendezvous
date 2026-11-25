@@ -22,3 +22,7 @@ engineStrict: true
 # it is published.
 minimumReleaseAgeExclude:
   - "@stacks/rendezvous"
+  # Adopted on release day (2026-11-25). Pinned to the exact version so later
+  # releases wait out the release age again; remove both after 2026-11-30.
+  - "@stacks/clarinet-sdk@4.1.0"
+  - "@stacks/clarinet-sdk-wasm@4.1.0"

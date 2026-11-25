@@ -10,6 +10,15 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    # @stacks/clarinet-sdk depends on an exact @stacks/transactions version.
+    # Bump ours by hand to the version clarinet-sdk uses, so a single copy is
+    # installed. Only version updates are ignored; security updates still open.
+    ignore:
+      - dependency-name: "@stacks/transactions"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     # PR titles become squash commit subjects; keep them conventional.
     commit-message:
       prefix: chore

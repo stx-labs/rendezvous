@@ -10,10 +10,7 @@ export default defineConfig({
   test: {
     environment: "clarinet",
     pool: "forks",
-    poolOptions: {
-      threads: { singleThread: true },
-      forks: { singleFork: true },
-    },
+    maxWorkers: 1,
     setupFiles: [vitestSetupFilePath],
     environmentOptions: {
       clarinet: {

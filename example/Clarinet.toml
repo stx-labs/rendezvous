@@ -68,7 +68,3 @@ epoch = 3.0
 path = 'contracts/self-listing-helper-v3a.clar'
 clarity_version = 3
 epoch = 3.1
-
-[repl.analysis]
-passes = ['check_checker']
-check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }

@@ -12,6 +12,8 @@ npm install @stacks/rendezvous
 
 Rendezvous ships with TypeScript declarations. You also need `fast-check` and `@stacks/clarinet-sdk` (both are already dependencies).
 
+Your project must use the same major version of `@stacks/clarinet-sdk` as Rendezvous, currently 4.x. A `simnet` created by another major version does not type-check against the functions below.
+
 ## API
 
 ### `getContractFunction(simnet, contractName, functionName, deployer?)`

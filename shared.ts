@@ -378,11 +378,14 @@ const charSet =
 const asciiChar = fc.constantFrom(...charSet);
 
 /**
- * A single code point for `string-utf8`: printable ASCII (the shrink target),
- * printable non-ASCII, or any code point. Never a lone surrogate, which UTF-8
- * encoding would silently replace with U+FFFD.
+ * A single code point for `string-utf8`: printable ASCII, printable non-ASCII,
+ * or any code point. Never a lone surrogate, which UTF-8 encoding would
+ * silently replace with U+FFFD. Cross-shrinking makes printable ASCII the
+ * shrink target of all three; without it a failing code point would shrink
+ * within its own branch, to U+0000 or to a space.
  */
 const utf8CodePoint: fc.Arbitrary<string> = fc.oneof(
+  { withCrossShrink: true },
   asciiChar,
   fc.string({ unit: "grapheme-composite", minLength: 1, maxLength: 1 }),
   // Any code point but the surrogates U+D800 to U+DFFF. Not the `binary`
@@ -410,6 +413,13 @@ const combiningMark = /\p{M}/u;
 const baseCharacter = /[\p{L}\p{N}\p{S}\p{M}]/u;
 
 /**
+ * A backslash escape already in the text, or else a single code point. The
+ * escapes are the ones `Cl.stringify` writes (`\n`, `\"`, `\\`, `\u001b`) and
+ * the `\u{...}` that `escapeNonPrintable` writes.
+ */
+const escapeOrCodePoint = /\\(?:u\{[0-9a-f]+\}|u[0-9a-f]{4}|[ -~])|[\s\S]/giu;
+
+/**
  * Escapes non-printable code points as `\u{...}`, keeping newlines and ASCII
  * spaces. A combining mark is kept only when it follows a visible base
  * character; otherwise it would render on top of a quote or an escape. That
@@ -423,29 +433,19 @@ export const escapeNonPrintable = (text: string): string => {
     return text;
   }
 
-  let printable = "";
   let afterBaseCharacter = false;
-  // Code points left in the backslash escape being read: one after the
-  // backslash (`\n`, `\"`, `\\`), or four more after a `u` (`\u001b`).
-  let escapeLength = 0;
-  let afterBackslash = false;
-  for (const c of text) {
-    const inEscape = escapeLength > 0;
-    if (inEscape) {
-      escapeLength = afterBackslash && c === "u" ? 4 : escapeLength - 1;
-      afterBackslash = false;
-    } else if (c === "\\") {
-      escapeLength = 1;
-      afterBackslash = true;
+  return text.replace(escapeOrCodePoint, (token) => {
+    if (token.length > 1 && token.startsWith("\\")) {
+      afterBaseCharacter = false;
+      return token;
     }
 
-    const escaped: boolean =
-      invisibleCodePoint.test(c) ||
-      (combiningMark.test(c) && !afterBaseCharacter);
-    printable += escaped ? `\\u{${c.codePointAt(0)!.toString(16)}}` : c;
-    afterBaseCharacter = !escaped && !inEscape && baseCharacter.test(c);
-  }
-  return printable;
+    const escaped =
+      invisibleCodePoint.test(token) ||
+      (combiningMark.test(token) && !afterBaseCharacter);
+    afterBaseCharacter = !escaped && baseCharacter.test(token);
+    return escaped ? `\\u{${token.codePointAt(0)!.toString(16)}}` : token;
+  });
 };
 
 /**

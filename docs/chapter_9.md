@@ -123,4 +123,4 @@ const arb = strategyFor(simnet, mint, [wallet1]);
 | `response`        | `ok` or `error` branch (recursive)               |
 | `trait_reference` | Random contract implementing the trait           |
 
-Integers at the top of their range overflow under arithmetic. See [Discarding Property-Based Tests](chapter_6.md#discarding-property-based-tests) for how to skip the inputs a test cannot accept.
+Integers at the top of their range overflow under arithmetic, and a call that hits a runtime error such as an overflow makes `simnet.callPublicFn` throw. Skip the inputs a function cannot accept with `fc.pre`, or narrow the arbitrary with `.filter`.

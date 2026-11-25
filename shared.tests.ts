@@ -198,6 +198,11 @@ describe("Clarity value printing", () => {
       Cl.stringUtf8("\n\u0301a\u0301\u200b\u0302\u{1d457}\u0080"),
     );
     expect(escapeNonPrintable(once)).toBe(once);
+    // A short `\u{...}` escape ends at its brace, so the "a" after it is still
+    // the base character of the mark the second time around.
+    const freeText = escapeNonPrintable("\u0001a\u0301");
+    expect(freeText).toBe("\\u{1}a\u0301");
+    expect(escapeNonPrintable(freeText)).toBe(freeText);
   });
 
   it("escapes non-ASCII spaces, ignorable and unassigned code points", () => {
@@ -417,12 +422,17 @@ describe("Argument generation", () => {
   });
 
   it.each([
-    ["int128", (v: bigint) => v >= BigInt(-5), Cl.int(-6)] as const,
-    ["int128", (v: bigint) => v <= BigInt(1000), Cl.int(1001)] as const,
-    ["uint128", (v: bigint) => v < BigInt(1000), Cl.uint(1000)] as const,
+    ["int128", "-6", (v: bigint) => v >= BigInt(-5), Cl.int(-6)] as const,
+    ["int128", "1001", (v: bigint) => v <= BigInt(1000), Cl.int(1001)] as const,
+    [
+      "uint128",
+      "u1000",
+      (v: bigint) => v < BigInt(1000),
+      Cl.uint(1000),
+    ] as const,
   ])(
-    "shrinks a failing %s to the smallest counterexample",
-    (type, holds, smallest) => {
+    "shrinks a failing %s to the smallest counterexample, %s",
+    (type, _, holds, smallest) => {
       const [arbitrary] = arbitrariesFor(type);
       // Covers failures first found on an exact bound, 1 value in 20.
       for (let seed = 0; seed < 200; seed++) {
@@ -434,6 +444,25 @@ describe("Argument generation", () => {
         );
         expect(details.failed).toBe(true);
         expect(details.counterexample).toEqual([smallest]);
+      }
+    },
+  );
+
+  it.each([
+    ["any non-empty string", (v: string) => v.length === 0, "A"] as const,
+    ["three code points", (v: string) => [...v].length < 3, "AAA"] as const,
+  ])(
+    "shrinks a failing string-utf8 to printable ASCII, %s",
+    (_, holds, smallest) => {
+      const [arbitrary] = arbitrariesFor({ "string-utf8": { length: 20 } });
+      // Covers strings first drawn from each of the three code point sources.
+      for (let seed = 0; seed < 100; seed++) {
+        const details = fc.check(
+          fc.property(arbitrary, (cv) => holds((cv as StringUtf8CV).value)),
+          { seed },
+        );
+        expect(details.failed).toBe(true);
+        expect(details.counterexample).toEqual([Cl.stringUtf8(smallest)]);
       }
     },
   );

@@ -5,8 +5,10 @@ import { initSimnet } from "@stacks/clarinet-sdk";
 import {
   Cl,
   ClarityType,
+  cvToString,
   type ClarityValue,
   type ListCV,
+  type TupleCV,
 } from "@stacks/transactions";
 import fc from "fast-check";
 
@@ -161,12 +163,14 @@ const arbitraryFor = (type: EnrichedParameterType): fc.Arbitrary<any> =>
 const loneSurrogate =
   /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
-describe("Argument generation", () => {
+describe("Argument ranges", () => {
   it.each([
     ["int128", INT128_MIN, INT128_MAX] as const,
     ["uint128", BigInt(0), UINT128_MAX] as const,
   ])("generates %s values across the full Clarity range", (type, min, max) => {
-    const values: bigint[] = fc.sample(arbitraryFor(type), 2_000);
+    const values = fc
+      .sample(arbitraryFor(type), 2_000)
+      .map((cv) => BigInt(cv.value));
     const beyond64Bits = BigInt(2) ** BigInt(64);
 
     expect(values.every((v) => v >= min && v <= max)).toBe(true);
@@ -211,20 +215,22 @@ describe("Argument generation", () => {
     (type, holds, smallest) => {
       // Covers failures first found on an exact bound, 1 value in 20.
       for (let seed = 0; seed < 200; seed++) {
-        const details = fc.check(fc.property(arbitraryFor(type), holds), {
-          seed,
-        });
+        const details = fc.check(
+          fc.property(arbitraryFor(type), (cv) => holds(BigInt(cv.value))),
+          { seed },
+        );
         expect(details.failed).toBe(true);
-        expect(details.counterexample).toEqual([smallest]);
+        expect(details.counterexample).toEqual([
+          type === "int128" ? Cl.int(smallest) : Cl.uint(smallest),
+        ]);
       }
     },
   );
 
   it("generates single ASCII, BMP and astral code points for string-utf8", () => {
-    const values = fc.sample(
-      arbitraryFor({ "string-utf8": { length: 1 } }),
-      1_000,
-    ) as string[];
+    const values = fc
+      .sample(arbitraryFor({ "string-utf8": { length: 1 } }), 1_000)
+      .map((cv) => cv.value as string);
     const codePoints = values.flatMap((v) =>
       [...v].map((c) => c.codePointAt(0)!),
     );
@@ -319,5 +325,164 @@ describe("Clarity value printing", () => {
     expect(escapeNonPrintable('u"\u001b[31m\r"\nnext\u0080')).toBe(
       'u"\\u{1b}[31m\\u{d}"\nnext\\u{80}',
     );
+  });
+});
+
+describe("Argument generation", () => {
+  const addresses = [
+    "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
+    "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+    "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG",
+  ];
+  const traitIdentifier = { issuer: [1], name: "traits" };
+  const ftTrait = { name: "ft-trait", contract_identifier: traitIdentifier };
+  const traitImplementations = {
+    [`${addresses[0]}.token-a`]: [ftTrait],
+    [`${addresses[0]}.token-b`]: [ftTrait],
+    [`${addresses[0]}.other`]: [
+      { name: "nft-trait", contract_identifier: traitIdentifier },
+    ],
+  };
+
+  const arbitrariesFor = (...types: EnrichedParameterType[]) =>
+    functionToArbitrary(
+      {
+        name: "f",
+        access: "public",
+        outputs: { type: "bool" },
+        args: types.map((type, i) => ({ name: `arg${i}`, type })),
+      } as EnrichedContractInterfaceFunction,
+      addresses,
+      traitImplementations,
+    );
+
+  const sampleAsStrings = (types: EnrichedParameterType[]) =>
+    fc
+      .sample(fc.tuple(...arbitrariesFor(...types)), { seed: 42, numRuns: 4 })
+      .map((args) => args.map((cv) => cvToString(cv)));
+
+  it.each<[EnrichedParameterType, ClarityValue]>([
+    ["bool", Cl.some(Cl.bool(false))],
+    ["uint128", Cl.some(Cl.uint(0))],
+    [{ "string-ascii": { length: 3 } }, Cl.some(Cl.stringAscii(""))],
+    [{ buffer: { length: 3 } }, Cl.some(Cl.bufferFromHex(""))],
+    [{ optional: "bool" }, Cl.some(Cl.none())],
+  ])("generates (some <falsy>) for optional %j", (inner, expected) => {
+    const [arbitrary] = arbitrariesFor({ optional: inner });
+    const generated = fc.sample(arbitrary, { seed: 1, numRuns: 2000 });
+
+    expect(generated).toContainEqual(expected);
+    expect(generated).toContainEqual(Cl.none());
+  });
+
+  it("generates a distinct object for each none", () => {
+    const [arbitrary] = arbitrariesFor({
+      list: { type: { optional: "bool" }, length: 8 },
+    });
+    const nones = fc
+      .sample(arbitrary, { seed: 1, numRuns: 200 })
+      .flatMap((cv) => (cv as ListCV).value)
+      .filter((cv) => cv.type === "none");
+
+    expect(nones.length).toBeGreaterThan(1);
+    expect(new Set(nones).size).toBe(nones.length);
+  });
+
+  it("generates tuples with a regular prototype", () => {
+    const [arbitrary] = arbitrariesFor({
+      tuple: [{ name: "a", type: "bool" }],
+    });
+    const generated = fc.sample(arbitrary, { seed: 1, numRuns: 200 });
+
+    generated.forEach((cv) => {
+      expect(Object.getPrototypeOf((cv as TupleCV).value)).toBe(
+        Object.prototype,
+      );
+    });
+  });
+
+  // If this test fails, seeds saved in `.rendezvous-regressions` now replay to
+  // different arguments: call that out as a user-visible change instead of
+  // refreshing the values. They were last refreshed when `int` and `uint`
+  // became full-range and `string-utf8` non-ASCII, a change the docs call out
+  // (chapter 6, "Seeds are tied to the Rendezvous version").
+  it.each<[string, EnrichedParameterType[], string[][]]>([
+    [
+      "tuples, responses and integers",
+      [
+        {
+          tuple: [
+            { name: "a", type: "bool" },
+            { name: "b", type: "int128" },
+          ],
+        },
+        {
+          response: { ok: "uint128", error: { "string-ascii": { length: 3 } } },
+        },
+        "uint128",
+      ],
+      [
+        [
+          "(tuple (a false) (b 0))",
+          '(err "D")',
+          "u13641652189140706672729554620",
+        ],
+        ["(tuple (a true) (b 897290250392))", '(err "")', "u2"],
+        ["(tuple (a true) (b 8212944151))", '(err "dD")', "u1754597997475220"],
+        ["(tuple (a false) (b 28078450097696348))", '(err "*Dm")', "u0"],
+      ],
+    ],
+    [
+      "lists, buffers, utf8 strings, principals and trait references",
+      [
+        { list: { type: { buffer: { length: 2 } }, length: 3 } },
+        { "string-utf8": { length: 4 } },
+        "principal",
+        {
+          trait_reference: {
+            name: "token",
+            import: { Imported: ftTrait },
+          },
+        },
+      ],
+      [
+        ["(list )", 'u"6\u{1d457}y"', addresses[2], `${addresses[0]}.token-b`],
+        [
+          "(list 0x 0x98)",
+          'u"\u{10ffed}"',
+          addresses[0],
+          `${addresses[0]}.token-a`,
+        ],
+        ["(list )", 'u""', addresses[1], `${addresses[0]}.token-b`],
+        ["(list )", 'u""', addresses[1], `${addresses[0]}.token-a`],
+      ],
+    ],
+  ])("generates the same %s for a fixed seed", (_, types, expected) => {
+    expect(sampleAsStrings(types)).toEqual(expected);
+  });
+
+  // These guard later changes the same way. Before falsy optionals became
+  // reachable, every `(some false)` and `(some "")` below came out as `none`.
+  it("generates the same optionals for a fixed seed", () => {
+    expect(
+      sampleAsStrings([
+        { optional: "bool" },
+        { optional: { "string-ascii": { length: 2 } } },
+        { list: { type: { optional: "uint128" }, length: 3 } },
+      ]),
+    ).toEqual([
+      [
+        "(some false)",
+        '(some "")',
+        "(list none (some u310922615578646204618026418))",
+      ],
+      ["(some false)", '(some "d")', "(list )"],
+      [
+        "(some false)",
+        "none",
+        "(list (some u4979923678649101874735882) (some u0) (some u1754597997475220))",
+      ],
+      ["none", "none", "(list (some u3087404689929566227400337680436445532))"],
+    ]);
   });
 });

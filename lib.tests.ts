@@ -132,4 +132,27 @@ describe("strategyFor", () => {
       { numRuns: 10 },
     );
   });
+
+  it("hands each run its own argument objects, including while shrinking", async () => {
+    const simnet = await initSimnet(manifestPath);
+    const fn = getContractFunction(simnet, "rendezvous-token", "mint");
+    const arb = strategyFor(simnet, fn);
+    const recipients: ClarityValue[] = [];
+
+    expect(() =>
+      fc.assert(
+        fc.property(arb, ([recipient, amount]: ClarityValue[]) => {
+          recipients.push(recipient);
+          // Edit the argument in place, as a pre-dialer could.
+          (recipient as { value: string }).value = "mutated";
+          return (amount as { value: bigint }).value < BigInt(1000);
+        }),
+        { seed: 3, numRuns: 1000 },
+      ),
+    ).toThrow();
+
+    // A failure followed by shrinking runs the property several times.
+    expect(recipients.length).toBeGreaterThan(2);
+    expect(new Set(recipients).size).toBe(recipients.length);
+  });
 });

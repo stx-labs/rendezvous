@@ -461,16 +461,21 @@ const invariantTest = async (
         for (const [index, selectedFunction] of r.selectedFunctions.entries()) {
           const [sutCallerWallet, sutCallerAddress] = r.sutCallers[index];
 
-          const printedFunctionArgs = r.selectedFunctionsArgsList[index]
-            .map(printCV)
-            .join(" ");
+          // While it shrinks one part of a case, fast-check hands the other
+          // parts back as the same objects. Copy the arguments for this call
+          // so a dialer editing them in place cannot change a later run.
+          const functionArgs = structuredClone(
+            r.selectedFunctionsArgsList[index],
+          );
+
+          const printedFunctionArgs = functionArgs.map(printCV).join(" ");
 
           try {
             if (dialerRegistry !== undefined) {
               await dialerRegistry.executePreDialers({
                 selectedFunction,
                 functionCall: undefined,
-                clarityValueArguments: r.selectedFunctionsArgsList[index],
+                clarityValueArguments: functionArgs,
               });
             }
           } catch (error: any) {
@@ -481,7 +486,7 @@ const invariantTest = async (
             const functionCall = simnet.callPublicFn(
               r.rendezvousContractId,
               selectedFunction.name,
-              r.selectedFunctionsArgsList[index],
+              functionArgs,
               sutCallerAddress,
             );
 
@@ -538,7 +543,7 @@ const invariantTest = async (
                   await dialerRegistry.executePostDialers({
                     selectedFunction,
                     functionCall,
-                    clarityValueArguments: r.selectedFunctionsArgsList[index],
+                    clarityValueArguments: functionArgs,
                   });
                 }
               } catch (error: any) {

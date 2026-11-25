@@ -21,13 +21,14 @@ afterEach(() => {
  * Runs Rendezvous against a single contract in a temporary Clarinet project
  * without requirements and returns the logs, exit code and the counterexample
  * paths of the persisted failures. Without bailing, fast-check shrinks the
- * failure.
+ * failure. An invariant run loads `dialer`, when given, as its dialer module.
  */
 const run = async (
   source: string,
   type: "test" | "invariant" = "test",
   bail = true,
   regr = false,
+  dialer?: string,
 ) => {
   const directory = mkdtempSync(join(tmpdir(), "rendezvous-test-outcome-"));
   mkdirSync(join(directory, "settings"));
@@ -43,6 +44,11 @@ epoch = 3.0
 `,
   );
   writeFileSync(join(directory, "fixture.clar"), source);
+  let dialPath: string | undefined = undefined;
+  if (dialer !== undefined) {
+    dialPath = join(directory, "dial.mjs");
+    writeFileSync(dialPath, dialer);
+  }
   writeFileSync(
     join(directory, "settings/Devnet.toml"),
     `[network]
@@ -102,7 +108,7 @@ balance = 100000000000000
         functions,
         17,
         20,
-        undefined,
+        dialPath,
         bail,
         regr,
         radio,
@@ -357,5 +363,34 @@ describe("Invariant testing outcomes", () => {
     expect(result.logs).toContain("OK, invariants passed after 20 runs.");
     expect(result.logs).not.toContain("Warning:");
     expect(result.paths).toHaveLength(0);
+  });
+
+  it("hands dialers their own arguments in every run, including while shrinking", async () => {
+    // Whether each argument a pre-dialer received still carried the mark an
+    // earlier run left on it.
+    const alreadyMarked: boolean[] = [];
+    vi.stubGlobal("__rvAlreadyMarked", alreadyMarked);
+    try {
+      const result = await run(
+        `${context}
+(define-public (touch (n uint)) (ok true))
+(define-read-only (invariant-fail) false)`,
+        "invariant",
+        false,
+        false,
+        `export const preMark = ({ clarityValueArguments: [n] }) => {
+  globalThis.__rvAlreadyMarked.push(n.marked === true);
+  n.marked = true;
+};
+`,
+      );
+
+      expect(result.exitCode).toBe(1);
+      // Shrinking replays the failing case, so the dialer runs several times.
+      expect(alreadyMarked.length).toBeGreaterThan(1);
+      expect(alreadyMarked).not.toContain(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

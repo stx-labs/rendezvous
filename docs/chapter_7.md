@@ -427,7 +427,7 @@ Let's address them one by one.
 
 The test discards invalid cases: when `amount` is `u0`, or when the new total loan would exceed half the deposit (which also covers cases with no deposits).
 
-> Rendezvous generates `uint` arguments across their full 128-bit range. An arithmetic overflow in a test is a runtime error, which Rendezvous reports as a failure, so the discard check avoids adding `amount` to anything before it is known to be small enough.
+> `amount` can be any `uint`, up to 2^128 - 1, and an overflow would fail the test (see [Discarding Property-Based Tests](chapter_6.md#discarding-property-based-tests)). That is why the check subtracts from `allowed-borrow` instead of adding `amount` to the loan.
 
 > Now the test only runs when valid preconditions are met.
 

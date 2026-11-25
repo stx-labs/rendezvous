@@ -538,7 +538,7 @@ By embedding execution tracking into the contract, Rendezvous enables **more eff
 
 ## Discarding Property-Based Tests
 
-Rendezvous generates a wide range of inputs, but not all inputs are valid for every test. To **skip tests with invalid inputs**, there are two approaches:
+Rendezvous generates a wide range of inputs, but not all inputs are valid for every test. In particular, `uint` and `int` arguments span their full 128-bit range, so arithmetic on them can overflow, and an overflow is a runtime error that fails the test. To **skip tests with invalid inputs**, there are two approaches:
 
 ### Discard Function
 
@@ -574,8 +574,6 @@ A **separate function** determines whether a test should run.
 ```
 
 Here, `can-test-add` ensures that the test **never executes** for `n <= 1`, or for an `n` that would overflow the counter.
-
-> Rendezvous generates `uint` and `int` arguments across their full 128-bit range. Arithmetic on them can overflow, and an overflow is a runtime error that fails the test. Discard the inputs your function cannot accept.
 
 ### In-Place Discarding
 

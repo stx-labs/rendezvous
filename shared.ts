@@ -148,11 +148,11 @@ const parameterTypeToArbitrary = (
 
 // `BigInt(...)` rather than `n` literals: the compile target is ES2019.
 /** Smallest Clarity `int` value: -2^127. */
-export const INT128_MIN = -(BigInt(2) ** BigInt(127));
+const INT128_MIN = -(BigInt(2) ** BigInt(127));
 /** Largest Clarity `int` value: 2^127 - 1. */
-export const INT128_MAX = BigInt(2) ** BigInt(127) - BigInt(1);
+const INT128_MAX = BigInt(2) ** BigInt(127) - BigInt(1);
 /** Largest Clarity `uint` value: 2^128 - 1. */
-export const UINT128_MAX = BigInt(2) ** BigInt(128) - BigInt(1);
+const UINT128_MAX = BigInt(2) ** BigInt(128) - BigInt(1);
 
 /**
  * A `bigint` in `[0, 2^maxBits - 1]` whose bit width is drawn first, so every
@@ -164,7 +164,7 @@ const magnitude = (maxBits: number): fc.Arbitrary<bigint> =>
   fc
     .tuple(
       fc.oneof(
-        fc.integer({ min: 0, max: Math.min(64, maxBits) }),
+        fc.integer({ min: 0, max: 64 }),
         fc.integer({ min: 0, max: maxBits }),
       ),
       fc.noBias(
@@ -188,8 +188,8 @@ class FullRangeBigIntArbitrary extends fc.Arbitrary<bigint> {
 
   constructor(source: fc.Arbitrary<bigint>, min: bigint, max: bigint) {
     super();
-    // `fc.bigInt` rarely hits the exact bounds, and neither does `source`, so
-    // they are also drawn directly 1 time in 20.
+    // `source` rarely hits the exact bounds, so they are also drawn directly
+    // 1 time in 20.
     this.source = fc.oneof(
       { arbitrary: source, weight: 19 },
       { arbitrary: fc.constantFrom(min, max), weight: 1 },
@@ -385,27 +385,29 @@ const asciiChar = fc.constantFrom(...charSet);
 const utf8CodePoint: fc.Arbitrary<string> = fc.oneof(
   asciiChar,
   fc.string({ unit: "grapheme-composite", minLength: 1, maxLength: 1 }),
-  fc.string({ unit: "binary", minLength: 1, maxLength: 1 }),
+  // Any code point but the surrogates U+D800 to U+DFFF. Not the `binary`
+  // string unit: building it indexes every code point, which costs a quarter
+  // of a second and 85 MB as soon as this module loads.
+  fc
+    .integer({ min: 0, max: 0x10ffff - 0x800 })
+    .map((i) => String.fromCodePoint(i < 0xd800 ? i : i + 0x800)),
 );
 
 /**
  * Code points that are invisible or would corrupt terminal output: controls
- * (e.g. ESC, CR, C1), format characters (e.g. zero-width space), private-use,
- * unassigned and surrogate code points, separators other than the ASCII space
- * (e.g. no-break space, line separator), and default-ignorable code points
- * (e.g. variation selectors, Hangul fillers).
+ * other than newline (e.g. ESC, CR, C1), format characters (e.g. zero-width
+ * space), private-use, unassigned and surrogate code points, separators other
+ * than the ASCII space (e.g. no-break space, line separator), and
+ * default-ignorable code points (e.g. variation selectors, Hangul fillers).
  */
-const invisibleCodePoint = /[\p{C}\p{Z}\p{Default_Ignorable_Code_Point}]/u;
+const invisibleCodePoint =
+  /(?![\n ])[\p{C}\p{Z}\p{Default_Ignorable_Code_Point}]/u;
 
 /** A combining mark, which is only legible on top of a base character. */
 const combiningMark = /\p{M}/u;
 
 /** A visible character that a following combining mark can attach to. */
 const baseCharacter = /[\p{L}\p{N}\p{S}\p{M}]/u;
-
-/** Cheap pre-check: anything `escapeNonPrintable` could have to escape. */
-const mayNeedEscaping =
-  /(?![\n ])[\p{C}\p{Z}\p{M}\p{Default_Ignorable_Code_Point}]/u;
 
 /**
  * Escapes non-printable code points as `\u{...}`, keeping newlines and ASCII
@@ -417,7 +419,7 @@ const mayNeedEscaping =
  * @returns The printable text.
  */
 export const escapeNonPrintable = (text: string): string => {
-  if (!mayNeedEscaping.test(text)) {
+  if (!invisibleCodePoint.test(text) && !combiningMark.test(text)) {
     return text;
   }
 
@@ -438,10 +440,8 @@ export const escapeNonPrintable = (text: string): string => {
     }
 
     const escaped: boolean =
-      c !== "\n" &&
-      c !== " " &&
-      (invisibleCodePoint.test(c) ||
-        (combiningMark.test(c) && !afterBaseCharacter));
+      invisibleCodePoint.test(c) ||
+      (combiningMark.test(c) && !afterBaseCharacter);
     printable += escaped ? `\\u{${c.codePointAt(0)!.toString(16)}}` : c;
     afterBaseCharacter = !escaped && !inEscape && baseCharacter.test(c);
   }

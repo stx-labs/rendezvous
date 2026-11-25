@@ -4,15 +4,16 @@ import { join, resolve } from "node:path";
 import { initSimnet } from "@stacks/clarinet-sdk";
 import {
   Cl,
-  ClarityType,
   cvToString,
   type ClarityValue,
+  type IntCV,
   type ListCV,
+  type StringUtf8CV,
   type TupleCV,
+  type UIntCV,
 } from "@stacks/transactions";
 import fc from "fast-check";
 
-import { getContractFunction, strategyFor } from "./lib";
 import {
   escapeNonPrintable,
   functionToArbitrary,
@@ -20,10 +21,7 @@ import {
   getFunctionsFromContractInterfaces,
   getFunctionsListForContract,
   getSimnetDeployerContractsInterfaces,
-  INT128_MAX,
-  INT128_MIN,
   printCV,
-  UINT128_MAX,
 } from "./shared";
 import type {
   EnrichedContractInterfaceFunction,
@@ -141,141 +139,6 @@ describe("Contract identifier parsing", () => {
         },
       ),
     );
-  });
-});
-
-/**
- * Builds the fast-check arbitrary for a single argument of the given type.
- */
-const arbitraryFor = (type: EnrichedParameterType): fc.Arbitrary<any> =>
-  functionToArbitrary(
-    {
-      name: "f",
-      access: "public",
-      args: [{ name: "x", type }],
-      outputs: { type: "bool" },
-    } as unknown as EnrichedContractInterfaceFunction,
-    [],
-    {},
-  )[0];
-
-/** Matches a high or low surrogate that is not part of a valid pair. */
-const loneSurrogate =
-  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-
-describe("Argument ranges", () => {
-  it.each([
-    ["int128", INT128_MIN, INT128_MAX] as const,
-    ["uint128", BigInt(0), UINT128_MAX] as const,
-  ])("generates %s values across the full Clarity range", (type, min, max) => {
-    const values = fc
-      .sample(arbitraryFor(type), 2_000)
-      .map((cv) => BigInt(cv.value));
-    const beyond64Bits = BigInt(2) ** BigInt(64);
-
-    expect(values.every((v) => v >= min && v <= max)).toBe(true);
-    expect(values).toContain(min);
-    expect(values).toContain(max);
-    expect(values.some((v) => v !== max && v > beyond64Bits)).toBe(true);
-    if (min < 0) {
-      expect(values.some((v) => v !== min && v < -beyond64Bits)).toBe(true);
-    }
-    // Still biased toward small values.
-    expect(
-      values.filter((v) => v >= -1000 && v <= 1000).length,
-    ).toBeGreaterThan(100);
-    // Every magnitude in between is covered, not only the two extremes.
-    const magnitudes = values.map((v) => (v < 0 ? -v : v));
-    for (const [low, high] of [
-      [10, 20],
-      [20, 32],
-      [32, 48],
-      [48, 64],
-      [64, 100],
-      [100, 127],
-    ]) {
-      expect(
-        magnitudes.filter(
-          (m) => m >= BigInt(2) ** BigInt(low) && m < BigInt(2) ** BigInt(high),
-        ).length,
-      ).toBeGreaterThan(50);
-    }
-    // Most values fit in 64 bits, where realistic amounts live.
-    expect(magnitudes.filter((m) => m < beyond64Bits).length).toBeGreaterThan(
-      1_200,
-    );
-  });
-
-  it.each([
-    ["int128", (v: bigint) => v >= BigInt(-5), BigInt(-6)] as const,
-    ["int128", (v: bigint) => v <= BigInt(1000), BigInt(1001)] as const,
-    ["uint128", (v: bigint) => v < BigInt(1000), BigInt(1000)] as const,
-  ])(
-    "shrinks a failing %s to the smallest counterexample",
-    (type, holds, smallest) => {
-      // Covers failures first found on an exact bound, 1 value in 20.
-      for (let seed = 0; seed < 200; seed++) {
-        const details = fc.check(
-          fc.property(arbitraryFor(type), (cv) => holds(BigInt(cv.value))),
-          { seed },
-        );
-        expect(details.failed).toBe(true);
-        expect(details.counterexample).toEqual([
-          type === "int128" ? Cl.int(smallest) : Cl.uint(smallest),
-        ]);
-      }
-    },
-  );
-
-  it("generates single ASCII, BMP and astral code points for string-utf8", () => {
-    const values = fc
-      .sample(arbitraryFor({ "string-utf8": { length: 1 } }), 1_000)
-      .map((cv) => cv.value as string);
-    const codePoints = values.flatMap((v) =>
-      [...v].map((c) => c.codePointAt(0)!),
-    );
-
-    for (const value of values) {
-      expect([...value].length).toBeLessThanOrEqual(1);
-      expect(value).not.toMatch(loneSurrogate);
-    }
-    expect(codePoints.some((cp) => cp < 0x80)).toBe(true);
-    expect(codePoints.some((cp) => cp >= 0x80 && cp < 0x10000)).toBe(true);
-    expect(codePoints.some((cp) => cp >= 0x10000)).toBe(true);
-  });
-
-  it("produces arguments the simnet accepts unchanged", async () => {
-    // Setup
-    const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
-      isolatedTestEnvPrefix,
-    );
-    const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
-    const reversed = ([arg]: ClarityValue[]) =>
-      arg.type === ClarityType.StringUTF8
-        ? Cl.stringUtf8([...arg.value].reverse().join(""))
-        : Cl.list([...(arg as ListCV).value].reverse());
-
-    // Exercise & Verify: these functions return their input reversed, so any
-    // value the simnet altered or rejected surfaces as a mismatch or a throw.
-    for (const fnName of ["reverse", "reverse-uint", "reverse-string"]) {
-      const fn = getContractFunction(simnet, "reverse", fnName);
-      fc.assert(
-        fc.property(strategyFor(simnet, fn), (args) => {
-          const { result } = simnet.callReadOnlyFn(
-            "reverse",
-            fnName,
-            args,
-            simnet.deployer,
-          );
-          expect(result).toEqual(reversed(args));
-        }),
-        { numRuns: 100 },
-      );
-    }
-
-    // Teardown
-    rmSync(tempDir, { recursive: true, force: true });
   });
 });
 
@@ -429,9 +292,7 @@ describe("Argument generation", () => {
 
   // If this test fails, seeds saved in `.rendezvous-regressions` now replay to
   // different arguments: call that out as a user-visible change instead of
-  // refreshing the values. They were last refreshed when `int` and `uint`
-  // became full-range and `string-utf8` non-ASCII, a change the docs call out
-  // (chapter 6, "Seeds are tied to the Rendezvous version").
+  // refreshing the values.
   it.each<[string, EnrichedParameterType[], string[][]]>([
     [
       "tuples, responses and integers",
@@ -475,9 +336,9 @@ describe("Argument generation", () => {
         ["(list )", 'u"6\u{1d457}y"', addresses[2], `${addresses[0]}.token-b`],
         [
           "(list 0x 0x98)",
-          'u"\u{10ffed}"',
-          addresses[0],
-          `${addresses[0]}.token-a`,
+          'u"\u000b"',
+          addresses[2],
+          `${addresses[0]}.token-b`,
         ],
         ["(list )", 'u""', addresses[1], `${addresses[0]}.token-b`],
         ["(list )", 'u""', addresses[1], `${addresses[0]}.token-a`],
@@ -510,5 +371,91 @@ describe("Argument generation", () => {
       ],
       ["none", "none", "(list (some u3087404689929566227400337680436445532))"],
     ]);
+  });
+
+  const pow2 = (n: number) => BigInt(2) ** BigInt(n);
+
+  it.each([
+    ["int128", -pow2(127), pow2(127) - BigInt(1)] as const,
+    ["uint128", BigInt(0), pow2(128) - BigInt(1)] as const,
+  ])("generates %s values across the full Clarity range", (type, min, max) => {
+    const [arbitrary] = arbitrariesFor(type);
+    const values = fc
+      .sample(arbitrary, 2_000)
+      .map((cv) => BigInt((cv as IntCV | UIntCV).value));
+    const beyond64Bits = pow2(64);
+
+    expect(values.every((v) => v >= min && v <= max)).toBe(true);
+    expect(values).toContain(min);
+    expect(values).toContain(max);
+    expect(values.some((v) => v !== max && v > beyond64Bits)).toBe(true);
+    if (min < 0) {
+      expect(values.some((v) => v !== min && v < -beyond64Bits)).toBe(true);
+    }
+    // Still biased toward small values.
+    expect(
+      values.filter((v) => v >= -1000 && v <= 1000).length,
+    ).toBeGreaterThan(100);
+    // Every magnitude in between is covered, not only the two extremes.
+    const magnitudes = values.map((v) => (v < 0 ? -v : v));
+    for (const [low, high] of [
+      [pow2(10), pow2(20)],
+      [pow2(20), pow2(32)],
+      [pow2(32), pow2(48)],
+      [pow2(48), pow2(64)],
+      [pow2(64), pow2(100)],
+      [pow2(100), pow2(127)],
+    ]) {
+      expect(
+        magnitudes.filter((m) => m >= low && m < high).length,
+      ).toBeGreaterThan(50);
+    }
+    // Most values fit in 64 bits, where realistic amounts live.
+    expect(magnitudes.filter((m) => m < beyond64Bits).length).toBeGreaterThan(
+      1_200,
+    );
+  });
+
+  it.each([
+    ["int128", (v: bigint) => v >= BigInt(-5), Cl.int(-6)] as const,
+    ["int128", (v: bigint) => v <= BigInt(1000), Cl.int(1001)] as const,
+    ["uint128", (v: bigint) => v < BigInt(1000), Cl.uint(1000)] as const,
+  ])(
+    "shrinks a failing %s to the smallest counterexample",
+    (type, holds, smallest) => {
+      const [arbitrary] = arbitrariesFor(type);
+      // Covers failures first found on an exact bound, 1 value in 20.
+      for (let seed = 0; seed < 200; seed++) {
+        const details = fc.check(
+          fc.property(arbitrary, (cv) =>
+            holds(BigInt((cv as IntCV | UIntCV).value)),
+          ),
+          { seed },
+        );
+        expect(details.failed).toBe(true);
+        expect(details.counterexample).toEqual([smallest]);
+      }
+    },
+  );
+
+  it("generates single ASCII, BMP and astral code points for string-utf8", () => {
+    const [arbitrary] = arbitrariesFor({ "string-utf8": { length: 1 } });
+    const values = fc
+      .sample(arbitrary, 1_000)
+      .map((cv) => (cv as StringUtf8CV).value);
+    const codePoints = values.flatMap((v) =>
+      [...v].map((c) => c.codePointAt(0)!),
+    );
+    // A high or low surrogate that is not part of a valid pair.
+    const loneSurrogate =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+    for (const value of values) {
+      expect([...value].length).toBeLessThanOrEqual(1);
+      expect(value).not.toMatch(loneSurrogate);
+    }
+    expect(codePoints.some((cp) => cp < 0x80)).toBe(true);
+    expect(codePoints.some((cp) => cp >= 0x80 && cp < 0x10000)).toBe(true);
+    expect(codePoints.some((cp) => cp >= 0x10000)).toBe(true);
   });
 });

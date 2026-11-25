@@ -1,7 +1,12 @@
 import { join, resolve } from "node:path";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
-import type { ClarityValue } from "@stacks/transactions";
+import {
+  Cl,
+  ClarityType,
+  type ClarityValue,
+  type ListCV,
+} from "@stacks/transactions";
 import fc from "fast-check";
 
 import { getContractFunction, strategyFor } from "./lib";
@@ -114,6 +119,32 @@ describe("strategyFor", () => {
       }),
       { numRuns: 5 },
     );
+  });
+
+  it("produces arguments the simnet accepts unchanged", async () => {
+    const simnet = await initSimnet(manifestPath);
+    const reversed = ([arg]: ClarityValue[]) =>
+      arg.type === ClarityType.StringUTF8
+        ? Cl.stringUtf8([...arg.value].reverse().join(""))
+        : Cl.list([...(arg as ListCV).value].reverse());
+
+    // These functions return their input reversed, so any value the simnet
+    // altered or rejected surfaces as a mismatch or a throw.
+    for (const fnName of ["reverse", "reverse-uint", "reverse-string"]) {
+      const fn = getContractFunction(simnet, "reverse", fnName);
+      fc.assert(
+        fc.property(strategyFor(simnet, fn), (args) => {
+          const { result } = simnet.callReadOnlyFn(
+            "reverse",
+            fnName,
+            args,
+            simnet.deployer,
+          );
+          expect(result).toEqual(reversed(args));
+        }),
+        { numRuns: 100 },
+      );
+    }
   });
 
   it("honors allAddresses override for principal-typed arguments", async () => {

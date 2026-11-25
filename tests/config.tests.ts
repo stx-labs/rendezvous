@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadConfig, resolveAccounts, type ConfigAccount } from "./config";
+import { loadConfig, resolveAccounts, type ConfigAccount } from "../src/config";
 
 // Unique per run, so concurrent runs on the same machine don't collide.
 const temporaryTestBaseDir = mkdtempSync(

@@ -22,11 +22,11 @@ import {
   getFunctionsListForContract,
   getSimnetDeployerContractsInterfaces,
   printCV,
-} from "./shared";
+} from "../src/shared";
 import type {
   EnrichedContractInterfaceFunction,
   EnrichedParameterType,
-} from "./shared.types";
+} from "../src/shared.types";
 import { createIsolatedTestEnvironment } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-shared-";
@@ -35,7 +35,7 @@ describe("Simnet contracts operations", () => {
   it("retrieves the contracts from the simnet", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -60,7 +60,7 @@ describe("Simnet contracts operations", () => {
   it("retrieves the contract functions from the simnet", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -92,7 +92,7 @@ describe("Simnet contracts operations", () => {
   it("extracts the functions from the contract interfaces", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");

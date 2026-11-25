@@ -14,7 +14,7 @@ import {
   isParamsMatch,
   isReturnTypeBoolean,
   isTestDiscardedInPlace,
-} from "./property";
+} from "../src/property";
 import { createIsolatedTestEnvironment } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-property-";
@@ -218,7 +218,7 @@ describe("Test discarding related operations", () => {
   it("in place discard function returns true if the function call result is (ok false)", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");
@@ -251,7 +251,7 @@ describe("Test discarding related operations", () => {
   it("in place discard function returns false if the function call result is (ok true)", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const manifestPath = join(tempDir, "Clarinet.toml");

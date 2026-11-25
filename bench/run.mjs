@@ -27,6 +27,7 @@ import { parseArgs, stripVTControlCharacters } from "node:util";
 
 const benchDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(benchDir, "..");
+const srcDir = join(rootDir, "src");
 const appPath = join(rootDir, "dist", "app.js");
 const rusagePreload = join(benchDir, "rusage.cjs");
 
@@ -85,11 +86,9 @@ if (!existsSync(appPath)) {
 // Warn when a source file changed after the last build, since the benchmark
 // would otherwise silently measure the old code.
 const builtAt = statSync(appPath).mtimeMs;
-const staleSources = readdirSync(rootDir).filter(
+const staleSources = readdirSync(srcDir).filter(
   (file) =>
-    file.endsWith(".ts") &&
-    !file.endsWith(".tests.ts") &&
-    statSync(join(rootDir, file)).mtimeMs > builtAt,
+    file.endsWith(".ts") && statSync(join(srcDir, file)).mtimeMs > builtAt,
 );
 if (staleSources.length > 0) {
   console.warn(

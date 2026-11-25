@@ -1,6 +1,6 @@
 import type { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
@@ -13,14 +13,12 @@ import { LOG_DIVIDER } from "./shared";
 
 /**
  * The package version, read at runtime: a static `import` of `package.json`
- * would make tsc copy it into `dist/`. This module runs as TypeScript from the
- * package root (tests) and as JavaScript from `dist/` once built.
+ * would make tsc copy it into `dist/`. This module runs as TypeScript from
+ * `src/` (tests) and as JavaScript from `dist/` once built, both one level
+ * below the package root.
  */
 const { version } = JSON.parse(
-  readFileSync(
-    join(__dirname, extname(__filename) === ".ts" ? "." : "..", "package.json"),
-    "utf8",
-  ),
+  readFileSync(join(__dirname, "..", "package.json"), "utf8"),
 ) as { version: string };
 
 export const helpMessage = `

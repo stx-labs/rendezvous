@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { getManifestFileName, main } from "./app";
-import { helpMessage } from "./cli";
-import { red } from "./colors";
-import { getFailureFilePath } from "./persistence";
-import { LOG_DIVIDER } from "./shared";
+import { getManifestFileName, main } from "../src/app";
+import { helpMessage } from "../src/cli";
+import { red } from "../src/colors";
+import { getFailureFilePath } from "../src/persistence";
+import { LOG_DIVIDER } from "../src/shared";
 import { createIsolatedTestEnvironment } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-app-";
@@ -456,7 +456,7 @@ describe("Command-line arguments handling", () => {
     async (_testCase: string[], argv: string[], expectedLogs: string[]) => {
       // Setup
       const tempDir = createIsolatedTestEnvironment(
-        resolve(__dirname, "example"),
+        resolve(__dirname, "..", "example"),
         isolatedTestEnvPrefix,
       );
 
@@ -529,7 +529,7 @@ describe("Fail on unchecked", () => {
     async (type, strict) => {
       const { source, warning } = cases[type];
       const tempDir = createIsolatedTestEnvironment(
-        resolve(__dirname, "example"),
+        resolve(__dirname, "..", "example"),
         isolatedTestEnvPrefix,
       );
       const initialArgv = process.argv;
@@ -579,7 +579,7 @@ describe("Contract selection", () => {
   it("logs an error when the contract is not found among project contracts", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     process.argv = ["node", "app.js", tempDir, "nonexistent", "test"];

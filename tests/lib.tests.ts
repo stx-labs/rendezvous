@@ -9,9 +9,9 @@ import {
 } from "@stacks/transactions";
 import fc from "fast-check";
 
-import { getContractFunction, strategyFor } from "./lib";
+import { getContractFunction, strategyFor } from "../src/lib";
 
-const manifestPath = join(resolve(__dirname, "example"), "Clarinet.toml");
+const manifestPath = join(resolve(__dirname, "..", "example"), "Clarinet.toml");
 
 describe("getContractFunction", () => {
   it("returns the function interface for a known contract and function", async () => {

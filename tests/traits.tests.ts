@@ -7,8 +7,7 @@ import type {
   IContractAST,
 } from "@stacks/clarinet-sdk-wasm";
 
-import type { EnrichedContractInterfaceFunction } from "./shared.types";
-import { createIsolatedTestEnvironment } from "./test.utils";
+import type { EnrichedContractInterfaceFunction } from "../src/shared.types";
 import {
   buildTraitReferenceMap,
   enrichInterfaceWithTraitData,
@@ -16,8 +15,9 @@ import {
   getContractIdsImplementingTrait,
   getNonTestableTraitFunctions,
   isTraitReferenceFunction,
-} from "./traits";
-import type { ImplementedTraitType } from "./traits.types";
+} from "../src/traits";
+import type { ImplementedTraitType } from "../src/traits.types";
+import { createIsolatedTestEnvironment } from "./test.utils";
 
 const isolatedTestEnvPrefix = "rendezvous-test-traits-";
 
@@ -2299,7 +2299,7 @@ describe("Trait reference processing", () => {
   it("correctly retrieves the contracts implementing an imported trait from the Clarinet project", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
@@ -2346,7 +2346,7 @@ describe("Trait reference processing", () => {
   it("correctly retrieves empty array when no corresponding trait implementations are found", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));
@@ -2389,7 +2389,7 @@ describe("Trait reference processing", () => {
   it("correctly retrieves the contracts implementing a defined trait from the Clarinet project", async () => {
     // Setup
     const tempDir = createIsolatedTestEnvironment(
-      resolve(__dirname, "example"),
+      resolve(__dirname, "..", "example"),
       isolatedTestEnvPrefix,
     );
     const simnet = await initSimnet(join(tempDir, "Clarinet.toml"));

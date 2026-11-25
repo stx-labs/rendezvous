@@ -6,10 +6,10 @@ import { stripVTControlCharacters } from "node:util";
 
 import { initSimnet } from "@stacks/clarinet-sdk";
 
-import { checkInvariants } from "./invariant";
-import * as persistence from "./persistence";
-import { checkProperties } from "./property";
-import { getFunctionsFromContractInterfaces } from "./shared";
+import { checkInvariants } from "../src/invariant";
+import * as persistence from "../src/persistence";
+import { checkProperties } from "../src/property";
+import { getFunctionsFromContractInterfaces } from "../src/shared";
 
 const originalExitCode = process.exitCode;
 afterEach(() => {

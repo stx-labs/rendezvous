@@ -4,12 +4,12 @@ import { join, resolve } from "node:path";
 
 import fc from "fast-check";
 
-import type { RunDetails } from "./heatstroke.types";
+import type { RunDetails } from "../src/heatstroke.types";
 import {
   getFailureFilePath,
   loadFailures,
   persistFailure,
-} from "./persistence";
+} from "../src/persistence";
 
 // Unique per run, so concurrent runs on the same machine don't collide.
 const temporaryTestBaseDir = mkdtempSync(

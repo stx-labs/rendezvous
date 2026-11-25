@@ -3,12 +3,7 @@ import { resolve } from "node:path";
 
 import type { Simnet } from "@stacks/clarinet-sdk";
 import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
-import {
-  Cl,
-  ClarityType,
-  cvToString,
-  type ClarityValue,
-} from "@stacks/transactions";
+import { Cl, ClarityType, type ClarityValue } from "@stacks/transactions";
 import fc from "fast-check";
 
 import { dim, green, red, underline, yellow } from "./colors";
@@ -30,6 +25,7 @@ import {
   getContractNameFromContractId,
   getFunctionsListForContract,
   LOG_DIVIDER,
+  printCV,
 } from "./shared";
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
 import {
@@ -472,9 +468,7 @@ const invariantTest = async (
             r.selectedFunctionsArgsList[index],
           );
 
-          const printedFunctionArgs = functionArgs
-            .map((cv) => cvToString(cv))
-            .join(" ");
+          const printedFunctionArgs = functionArgs.map(printCV).join(" ");
 
           try {
             if (dialerRegistry !== undefined) {
@@ -501,9 +495,7 @@ const invariantTest = async (
             // it to Clarity string format, and report it to improve the user
             // experiance by providing important information about the function
             // call during the run.
-            const selectedFunctionClarityResult = cvToString(
-              functionCall.result,
-            );
+            const selectedFunctionClarityResult = printCV(functionCall.result);
 
             if (functionCall.result.type === ClarityType.ResponseOk) {
               incrementCount(statistics.sut!.successful, selectedFunction.name);
@@ -533,7 +525,7 @@ const invariantTest = async (
                   simnet.deployer,
                 );
                 if (!isOkTrue(result)) {
-                  contextUpdate = `returned ${cvToString(result)}`;
+                  contextUpdate = `returned ${printCV(result)}`;
                 }
               } catch (error) {
                 contextUpdate = String(error);
@@ -608,9 +600,7 @@ const invariantTest = async (
           }
         }
 
-        const printedInvariantArgs = r.invariantArgs
-          .map((cv) => cvToString(cv))
-          .join(" ");
+        const printedInvariantArgs = r.invariantArgs.map(printCV).join(" ");
 
         const [invariantCallerWallet, invariantCallerAddress] =
           r.invariantCaller;
@@ -623,7 +613,7 @@ const invariantTest = async (
             invariantCallerAddress,
           );
 
-          const invariantCallClarityResult = cvToString(invariantCallResult);
+          const invariantCallClarityResult = printCV(invariantCallResult);
 
           if (invariantCallResult.type === ClarityType.BoolTrue) {
             incrementCount(

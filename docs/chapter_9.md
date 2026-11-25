@@ -55,21 +55,34 @@ When neither override is supplied, principal addresses and trait implementations
 ```ts
 import { initSimnet } from "@stacks/clarinet-sdk";
 import { getContractFunction, strategyFor } from "@stacks/rendezvous";
+import type { UIntCV } from "@stacks/transactions";
 import fc from "fast-check";
 
+const MAX_UINT = 2n ** 128n - 1n;
+
 const simnet = await initSimnet("./Clarinet.toml");
+const counter = `${simnet.deployer}.counter`;
 const add = getContractFunction(simnet, "counter", "add");
 const arb = strategyFor(simnet, add);
 
 fc.assert(
   fc.property(arb, (args) => {
+    const n = BigInt((args[0] as UIntCV).value);
+    const before = BigInt(
+      (simnet.getDataVar(counter, "counter") as UIntCV).value,
+    );
+    // The simnet keeps its state between runs. Skip the amounts that would
+    // overflow the counter: that is a runtime error, and the call would throw.
+    fc.pre(n <= MAX_UINT - before);
+
     const { result } = simnet.callPublicFn(
-      `${simnet.deployer}.counter`,
+      counter,
       "add",
       args,
       simnet.deployer,
     );
-    return result.type !== "err";
+    // `add` only accepts amounts greater than 1.
+    return result.type === (n > 1n ? "ok" : "err");
   }),
 );
 ```
@@ -110,15 +123,17 @@ const arb = strategyFor(simnet, mint, [wallet1]);
 
 | Clarity Type      | Generated As                                     |
 | ----------------- | ------------------------------------------------ |
-| `uint`            | Natural numbers                                  |
-| `int`             | Integers                                         |
+| `uint`            | Full range, 0 to 2^128 - 1                       |
+| `int`             | Full range, -2^127 to 2^127 - 1                  |
 | `bool`            | Booleans                                         |
 | `principal`       | Random address from simnet accounts              |
 | `buff`            | Hex-encoded buffers (respects max length)        |
 | `string-ascii`    | ASCII strings (respects max length)              |
-| `string-utf8`     | UTF-8 strings (respects max length)              |
+| `string-utf8`     | Unicode strings (max length in code points)      |
 | `list`            | Arrays of the element type (recursive)           |
 | `tuple`           | Records with named fields (recursive)            |
 | `optional`        | `none` or `some` of the wrapped type (recursive) |
 | `response`        | `ok` or `error` branch (recursive)               |
 | `trait_reference` | Random contract implementing the trait           |
+
+Integers at the top of their range overflow under arithmetic, and a call that hits a runtime error such as an overflow makes `simnet.callPublicFn` throw. Skip the inputs a function cannot accept with `fc.pre`, as the [example](#example) does, or narrow the arbitrary with `.filter`.

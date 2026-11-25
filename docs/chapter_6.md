@@ -291,6 +291,8 @@ rv root contract test --regr
 
 Rendezvous will load all saved failures for the contract and replay them using their original seeds. This ensures that fixed bugs stay fixed.
 
+Seeds are tied to the Rendezvous version: if an upgrade changes how arguments are generated, a saved seed produces different arguments and no longer replays the original failure.
+
 **How Failure Persistence Works**
 
 When Rendezvous detects a failure, it automatically saves the test configuration to:
@@ -536,7 +538,7 @@ By embedding execution tracking into the contract, Rendezvous enables **more eff
 
 ## Discarding Property-Based Tests
 
-Rendezvous generates a wide range of inputs, but not all inputs are valid for every test. To **skip tests with invalid inputs**, there are two approaches:
+Rendezvous generates a wide range of inputs, but not all inputs are valid for every test. In particular, `uint` and `int` arguments span their full 128-bit range, so arithmetic on them can overflow, and an overflow is a runtime error that fails the test. To **skip tests with invalid inputs**, there are two approaches:
 
 ### Discard Function
 
@@ -552,8 +554,13 @@ A **separate function** determines whether a test should run.
 **Discard function example**
 
 ```clarity
+(define-constant MAX_UINT u340282366920938463463374607431768211455)
+
 (define-read-only (can-test-add (n uint))
-  (> n u1)  ;; Only allow tests where n > 1
+  (and
+    (> n u1)  ;; Only allow tests where n > 1...
+    (<= n (- MAX_UINT (get-counter)))  ;; ...and the counter cannot overflow.
+  )
 )
 
 (define-private (test-add (n uint))
@@ -566,7 +573,7 @@ A **separate function** determines whether a test should run.
 )
 ```
 
-Here, `can-test-add` ensures that the test **never executes** for `n <= 1`.
+Here, `can-test-add` ensures that the test **never executes** for `n <= 1`, or for an `n` that would overflow the counter.
 
 ### In-Place Discarding
 
@@ -575,12 +582,15 @@ Instead of using a separate function, **the test itself decides whether to run**
 **In-place discarding example**
 
 ```clarity
+(define-constant MAX_UINT u340282366920938463463374607431768211455)
+
 (define-private (test-add (n uint))
   (let
     ((counter-before (get-counter)))
     (ok
       (if
-        (<= n u1)  ;; If n <= 1, discard the test.
+        ;; If n <= 1, or adding n would overflow the counter, discard the test.
+        (or (<= n u1) (> n (- MAX_UINT counter-before)))
         false
         (begin
           (try! (add n))
@@ -593,7 +603,7 @@ Instead of using a separate function, **the test itself decides whether to run**
 )
 ```
 
-In this case, if `n <= 1`, the test **discards itself** by returning `(ok false)`, skipping execution.
+In this case, if `n <= 1` or adding `n` would overflow the counter, the test **discards itself** by returning `(ok false)`, skipping execution.
 
 ### Discarding summary
 

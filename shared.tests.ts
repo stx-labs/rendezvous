@@ -6,17 +6,22 @@ import {
   Cl,
   cvToString,
   type ClarityValue,
+  type IntCV,
   type ListCV,
+  type StringUtf8CV,
   type TupleCV,
+  type UIntCV,
 } from "@stacks/transactions";
 import fc from "fast-check";
 
 import {
+  escapeNonPrintable,
   functionToArbitrary,
   getContractNameFromContractId,
   getFunctionsFromContractInterfaces,
   getFunctionsListForContract,
   getSimnetDeployerContractsInterfaces,
+  printCV,
 } from "./shared";
 import type {
   EnrichedContractInterfaceFunction,
@@ -137,6 +142,86 @@ describe("Contract identifier parsing", () => {
   });
 });
 
+describe("Clarity value printing", () => {
+  it("escapes code points Cl.stringify leaves raw with \\u{...}", () => {
+    expect(printCV(Cl.stringUtf8("\u0080\u007f\u200b\u2028"))).toBe(
+      'u"\\u{80}\\u{7f}\\u{200b}\\u{2028}"',
+    );
+    expect(printCV(Cl.list([Cl.stringUtf8("\u{f0000}")]))).toBe(
+      '(list u"\\u{f0000}")',
+    );
+  });
+
+  it("keeps Cl.stringify escaping for newlines and C0 controls", () => {
+    expect(printCV(Cl.stringUtf8("a\nb\u001b[31m\u0000"))).toBe(
+      'u"a\\nb\\u001b[31m\\u0000"',
+    );
+  });
+
+  it("leaves printable values unchanged", () => {
+    expect(printCV(Cl.stringUtf8("héllo 中文 🛋"))).toBe('u"héllo 中文 🛋"');
+    // A combining mark on a base character, here a decomposed "é".
+    expect(printCV(Cl.stringUtf8("he\u0301llo"))).toBe('u"he\u0301llo"');
+  });
+
+  it("escapes combining marks that have no base character", () => {
+    expect(printCV(Cl.stringUtf8("\u0301a\u0301 \u0301"))).toBe(
+      'u"\\u{301}a\u0301 \\u{301}"',
+    );
+    // A mark after an escaped code point would render on the escape itself.
+    expect(printCV(Cl.stringUtf8("a\u200b\u0301\u0302"))).toBe(
+      'u"a\\u{200b}\\u{301}\\u{302}"',
+    );
+  });
+
+  it("escapes combining marks that follow an escaped character", () => {
+    // `Cl.stringify` writes these controls as `\n`, `\t`, `\r`, `\u0000` and
+    // `\u001b`, whose last character must not pass for a base character.
+    expect(
+      printCV(
+        Cl.stringUtf8("\n\u0301\t\u0301\r\u0301\u0000\u0301\u001b\u0301"),
+      ),
+    ).toBe(
+      'u"\\n\\u{301}\\t\\u{301}\\r\\u{301}\\u0000\\u{301}\\u001b\\u{301}"',
+    );
+    expect(printCV(Cl.stringUtf8('"\u0301\\\u0301'))).toBe(
+      'u"\\"\\u{301}\\\\\\u{301}"',
+    );
+    // A literal backslash followed by a letter is not an escape: the mark
+    // sits on a real "n", and on the "5" that follows an escape.
+    expect(printCV(Cl.stringUtf8("\\n\u0301"))).toBe('u"\\\\n\u0301"');
+    expect(printCV(Cl.stringUtf8("\u001b5\u0301"))).toBe('u"\\u001b5\u0301"');
+  });
+
+  it("escapes the same text once, however often it is applied", () => {
+    const once = printCV(
+      Cl.stringUtf8("\n\u0301a\u0301\u200b\u0302\u{1d457}\u0080"),
+    );
+    expect(escapeNonPrintable(once)).toBe(once);
+    // A short `\u{...}` escape ends at its brace, so the "a" after it is still
+    // the base character of the mark the second time around.
+    const freeText = escapeNonPrintable("\u0001a\u0301");
+    expect(freeText).toBe("\\u{1}a\u0301");
+    expect(escapeNonPrintable(freeText)).toBe(freeText);
+  });
+
+  it("escapes non-ASCII spaces, ignorable and unassigned code points", () => {
+    expect(printCV(Cl.stringUtf8("a b\u00a0\u3000"))).toBe(
+      'u"a b\\u{a0}\\u{3000}"',
+    );
+    expect(printCV(Cl.stringUtf8("\u2764\ufe0f\u3164"))).toBe(
+      'u"\u2764\\u{fe0f}\\u{3164}"',
+    );
+    expect(printCV(Cl.stringUtf8("\u0378\uffff"))).toBe('u"\\u{378}\\u{ffff}"');
+  });
+
+  it("escapes raw control characters in free text but keeps newlines", () => {
+    expect(escapeNonPrintable('u"\u001b[31m\r"\nnext\u0080')).toBe(
+      'u"\\u{1b}[31m\\u{d}"\nnext\\u{80}',
+    );
+  });
+});
+
 describe("Argument generation", () => {
   const addresses = [
     "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
@@ -210,10 +295,9 @@ describe("Argument generation", () => {
     });
   });
 
-  // These literals were generated before the argument arbitraries mapped
-  // straight to Clarity values. If this test fails, seeds saved in
-  // `.rendezvous-regressions` now replay to different arguments: call that
-  // out as a user-visible change instead of refreshing the values.
+  // If this test fails, seeds saved in `.rendezvous-regressions` now replay to
+  // different arguments: call that out as a user-visible change instead of
+  // refreshing the values.
   it.each<[string, EnrichedParameterType[], string[][]]>([
     [
       "tuples, responses and integers",
@@ -230,10 +314,14 @@ describe("Argument generation", () => {
         "uint128",
       ],
       [
-        ["(tuple (a false) (b -2))", "(ok u15541234)", "u1077723492"],
-        ["(tuple (a true) (b 2147483646))", "(ok u23)", "u1605711835"],
-        ["(tuple (a true) (b -11))", '(err "A")', "u21"],
-        ["(tuple (a false) (b 2147483626))", '(err "Q")', "u30"],
+        [
+          "(tuple (a false) (b 0))",
+          '(err "D")',
+          "u13641652189140706672729554620",
+        ],
+        ["(tuple (a true) (b 897290250392))", '(err "")', "u2"],
+        ["(tuple (a true) (b 8212944151))", '(err "dD")', "u1754597997475220"],
+        ["(tuple (a false) (b 28078450097696348))", '(err "*Dm")', "u0"],
       ],
     ],
     [
@@ -250,8 +338,13 @@ describe("Argument generation", () => {
         },
       ],
       [
-        ["(list )", 'u"LZy"', addresses[0], `${addresses[0]}.token-b`],
-        ["(list 0x 0x98)", 'u"$"', addresses[2], `${addresses[0]}.token-b`],
+        ["(list )", 'u"6\u{1d457}y"', addresses[2], `${addresses[0]}.token-b`],
+        [
+          "(list 0x 0x98)",
+          'u"\u000b"',
+          addresses[2],
+          `${addresses[0]}.token-b`,
+        ],
         ["(list )", 'u""', addresses[1], `${addresses[0]}.token-b`],
         ["(list )", 'u""', addresses[1], `${addresses[0]}.token-a`],
       ],
@@ -260,9 +353,8 @@ describe("Argument generation", () => {
     expect(sampleAsStrings(types)).toEqual(expected);
   });
 
-  // Unlike the literals above, these were generated after falsy optionals
-  // became reachable: before that, every `(some false)` and `(some "")` below
-  // came out as `none`. They guard later changes the same way.
+  // These guard later changes the same way. Before falsy optionals became
+  // reachable, every `(some false)` and `(some "")` below came out as `none`.
   it("generates the same optionals for a fixed seed", () => {
     expect(
       sampleAsStrings([
@@ -271,14 +363,128 @@ describe("Argument generation", () => {
         { list: { type: { optional: "uint128" }, length: 3 } },
       ]),
     ).toEqual([
-      ["(some false)", '(some "")', "(list none (some u8))"],
+      [
+        "(some false)",
+        '(some "")',
+        "(list none (some u310922615578646204618026418))",
+      ],
       ["(some false)", '(some "d")', "(list )"],
       [
         "(some false)",
         "none",
-        "(list (some u2047405135) (some u21) (some u10))",
+        "(list (some u4979923678649101874735882) (some u0) (some u1754597997475220))",
       ],
-      ["none", "none", "(list (some u1789811753))"],
+      ["none", "none", "(list (some u3087404689929566227400337680436445532))"],
     ]);
+  });
+
+  const pow2 = (n: number) => BigInt(2) ** BigInt(n);
+
+  it.each([
+    ["int128", -pow2(127), pow2(127) - BigInt(1)] as const,
+    ["uint128", BigInt(0), pow2(128) - BigInt(1)] as const,
+  ])("generates %s values across the full Clarity range", (type, min, max) => {
+    const [arbitrary] = arbitrariesFor(type);
+    const values = fc
+      .sample(arbitrary, 2_000)
+      .map((cv) => BigInt((cv as IntCV | UIntCV).value));
+    const beyond64Bits = pow2(64);
+
+    expect(values.every((v) => v >= min && v <= max)).toBe(true);
+    expect(values).toContain(min);
+    expect(values).toContain(max);
+    expect(values.some((v) => v !== max && v > beyond64Bits)).toBe(true);
+    if (min < 0) {
+      expect(values.some((v) => v !== min && v < -beyond64Bits)).toBe(true);
+    }
+    // Still biased toward small values.
+    expect(
+      values.filter((v) => v >= -1000 && v <= 1000).length,
+    ).toBeGreaterThan(100);
+    // Every magnitude in between is covered, not only the two extremes.
+    const magnitudes = values.map((v) => (v < 0 ? -v : v));
+    for (const [low, high] of [
+      [pow2(10), pow2(20)],
+      [pow2(20), pow2(32)],
+      [pow2(32), pow2(48)],
+      [pow2(48), pow2(64)],
+      [pow2(64), pow2(100)],
+      [pow2(100), pow2(127)],
+    ]) {
+      expect(
+        magnitudes.filter((m) => m >= low && m < high).length,
+      ).toBeGreaterThan(50);
+    }
+    // Most values fit in 64 bits, where realistic amounts live.
+    expect(magnitudes.filter((m) => m < beyond64Bits).length).toBeGreaterThan(
+      1_200,
+    );
+  });
+
+  it.each([
+    ["int128", "-6", (v: bigint) => v >= BigInt(-5), Cl.int(-6)] as const,
+    ["int128", "1001", (v: bigint) => v <= BigInt(1000), Cl.int(1001)] as const,
+    [
+      "uint128",
+      "u1000",
+      (v: bigint) => v < BigInt(1000),
+      Cl.uint(1000),
+    ] as const,
+  ])(
+    "shrinks a failing %s to the smallest counterexample, %s",
+    (type, _, holds, smallest) => {
+      const [arbitrary] = arbitrariesFor(type);
+      // Covers failures first found on an exact bound, 1 value in 20.
+      for (let seed = 0; seed < 200; seed++) {
+        const details = fc.check(
+          fc.property(arbitrary, (cv) =>
+            holds(BigInt((cv as IntCV | UIntCV).value)),
+          ),
+          { seed },
+        );
+        expect(details.failed).toBe(true);
+        expect(details.counterexample).toEqual([smallest]);
+      }
+    },
+  );
+
+  it.each([
+    ["any non-empty string", (v: string) => v.length === 0, "A"] as const,
+    ["three code points", (v: string) => [...v].length < 3, "AAA"] as const,
+  ])(
+    "shrinks a failing string-utf8 to printable ASCII, %s",
+    (_, holds, smallest) => {
+      const [arbitrary] = arbitrariesFor({ "string-utf8": { length: 20 } });
+      // Covers strings first drawn from each of the three code point sources.
+      for (let seed = 0; seed < 100; seed++) {
+        const details = fc.check(
+          fc.property(arbitrary, (cv) => holds((cv as StringUtf8CV).value)),
+          { seed },
+        );
+        expect(details.failed).toBe(true);
+        expect(details.counterexample).toEqual([Cl.stringUtf8(smallest)]);
+      }
+    },
+  );
+
+  it("generates single ASCII, BMP and astral code points for string-utf8", () => {
+    const [arbitrary] = arbitrariesFor({ "string-utf8": { length: 1 } });
+    const values = fc
+      .sample(arbitrary, 1_000)
+      .map((cv) => (cv as StringUtf8CV).value);
+    const codePoints = values.flatMap((v) =>
+      [...v].map((c) => c.codePointAt(0)!),
+    );
+    // A high or low surrogate that is not part of a valid pair.
+    const loneSurrogate =
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+    for (const value of values) {
+      expect([...value].length).toBeLessThanOrEqual(1);
+      expect(value).not.toMatch(loneSurrogate);
+    }
+    expect(codePoints.some((cp) => cp < 0x80)).toBe(true);
+    expect(codePoints.some((cp) => cp >= 0x80 && cp < 0x10000)).toBe(true);
+    expect(codePoints.some((cp) => cp >= 0x10000)).toBe(true);
   });
 });

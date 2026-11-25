@@ -13,6 +13,12 @@ import fc from "fast-check";
 import { dim, green, red, underline, yellow } from "./colors";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
+import {
+  drainInterrupts,
+  interruptBoundary,
+  isInterrupted,
+  markInterruptFatal,
+} from "./interrupt";
 import { strategyFor } from "./lib";
 import {
   getFailureFilePath,
@@ -182,6 +188,7 @@ export const checkProperties = async (
 
   if (hasDiscardFunctionErrors) {
     // The validation errors are already logged. No test can run, so fail.
+    markInterruptFatal(radio);
     process.exitCode = 1;
     return;
   }
@@ -230,6 +237,9 @@ export const checkProperties = async (
     }
 
     for (const regression of regressions) {
+      if (isInterrupted(radio)) {
+        break;
+      }
       emitPropertyRegressionTestHeader(
         radio,
         targetContractName,
@@ -336,10 +346,20 @@ const propertyTest = async (
   const failureStatistics = trackFailureStatistics(statistics);
 
   const radioReporter = async (runDetails: any) => {
-    reporter(runDetails, radio, "test", failureStatistics.get());
+    await drainInterrupts(radio);
+    reporter(
+      runDetails,
+      radio,
+      "test",
+      failureStatistics.get(),
+      isInterrupted(radio),
+    );
 
     // Persist failures for regression testing.
-    if (runDetails.failed) {
+    if (
+      runDetails.failed &&
+      (runDetails.counterexample || !isInterrupted(radio))
+    ) {
       persistFailure(
         runDetails,
         "test",
@@ -394,6 +414,7 @@ const propertyTest = async (
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
       failureStatistics.track(async (r) => {
+        await interruptBoundary(radio);
         const printedTestFunctionArgs = r.functionArgs
           .map((cv) => cvToString(cv))
           .join(" ");

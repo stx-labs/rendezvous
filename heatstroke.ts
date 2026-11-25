@@ -39,11 +39,12 @@ export const reporter = (
   radio: EventEmitter,
   type: "invariant" | "test",
   statistics: Statistics,
+  interrupted = false,
 ) => {
   const { counterexample, counterexamplePath, failed, numRuns, seed } =
     runDetails;
 
-  if (failed) {
+  if (failed && (counterexample || !interrupted)) {
     const error = runDetails.errorInstance || runDetails.error;
 
     // Extract the actual Clarity error once for both error types.
@@ -186,7 +187,7 @@ export const reporter = (
     // Set non-zero exit code to properly signal test failure to shells,
     // scripts, CI systems, and other tools that check process exit status.
     process.exitCode = 1;
-  } else {
+  } else if (!interrupted) {
     // A test or invariant without a passing check was never exercised, so do
     // not report it as passed. Discarded cases are not checks, and random
     // selection can skip a function entirely in short runs.

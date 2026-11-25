@@ -15,6 +15,12 @@ import { dim, green, red, underline, yellow } from "./colors";
 import { DialerRegistry, PostDialerError, PreDialerError } from "./dialer";
 import { incrementCount, reporter, trackFailureStatistics } from "./heatstroke";
 import type { Statistics } from "./heatstroke.types";
+import {
+  drainInterrupts,
+  interruptBoundary,
+  isInterrupted,
+  markInterruptFatal,
+} from "./interrupt";
 import type {
   InvariantTestConfig,
   InvariantTestContext,
@@ -237,6 +243,9 @@ export const checkInvariants = async (
     }
 
     for (const regression of regressions) {
+      if (isInterrupted(radio)) {
+        break;
+      }
       emitInvariantRegressionTestHeader(
         radio,
         targetContractName,
@@ -376,7 +385,9 @@ const invariantTest = async (
   let contextUpdateError: ContextUpdateError | undefined = undefined;
 
   const radioReporter = async (runDetails: any) => {
+    await drainInterrupts(radio);
     if (contextUpdateError !== undefined) {
+      markInterruptFatal(radio);
       radio.emit(
         "logFailure",
         `\nStopped the run: ${contextUpdateError.message}\n`,
@@ -385,10 +396,19 @@ const invariantTest = async (
       return;
     }
 
-    reporter(runDetails, radio, "invariant", failureStatistics.get());
+    reporter(
+      runDetails,
+      radio,
+      "invariant",
+      failureStatistics.get(),
+      isInterrupted(radio),
+    );
 
     // Persist failures for regression testing.
-    if (runDetails.failed) {
+    if (
+      runDetails.failed &&
+      (runDetails.counterexample || !isInterrupted(radio))
+    ) {
       persistFailure(runDetails, "invariant", rendezvousContractId, dial);
     }
   };
@@ -458,6 +478,7 @@ const invariantTest = async (
             .map((burnBlocks) => ({ ...r, ...burnBlocks })),
         ),
       failureStatistics.track(async (r) => {
+        await interruptBoundary(radio);
         if (contextUpdateError !== undefined) {
           return;
         }

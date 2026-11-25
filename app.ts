@@ -14,6 +14,11 @@ import {
 } from "./cli";
 import { red, yellow } from "./colors";
 import { resolveAccounts } from "./config";
+import {
+  drainInterrupts,
+  listenForInterrupt,
+  markInterruptFatal,
+} from "./interrupt";
 import { checkInvariants } from "./invariant";
 import { checkProperties } from "./property";
 import {
@@ -78,6 +83,19 @@ export const main = async () => {
     return;
   }
 
+  const interrupt = listenForInterrupt(radio);
+  try {
+    await run(radio, runConfig);
+  } catch (error) {
+    markInterruptFatal(radio);
+    throw error;
+  } finally {
+    await drainInterrupts(radio);
+    interrupt.close();
+  }
+};
+
+const run = async (radio: EventEmitter, runConfig: RunConfig) => {
   logWarnings(radio, runConfig.warnings);
 
   // Unchecked tests and inconclusive campaigns fail only on request. The
@@ -122,6 +140,7 @@ export const main = async () => {
   );
 
   if (rendezvousList.length === 0) {
+    markInterruptFatal(radio);
     radio.emit(
       "logFailure",
       `\nContract "${runConfig.sutContractName}" not found among project contracts.\n`,

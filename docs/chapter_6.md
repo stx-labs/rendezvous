@@ -149,6 +149,8 @@ rv root contract test --runs=500
 
 This increases the number of test cases to **500**.
 
+For Ctrl+C behavior, see the README.
+
 **2. Replaying a Specific Sequence of Events**
 
 To reproduce a previous test sequence, you can use the `--seed` option. This ensures that the same random values are used across test runs:

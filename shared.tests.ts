@@ -311,6 +311,32 @@ describe("Clarity value printing", () => {
     );
   });
 
+  it("escapes combining marks that follow an escaped character", () => {
+    // `Cl.stringify` writes these controls as `\n`, `\t`, `\r`, `\u0000` and
+    // `\u001b`, whose last character must not pass for a base character.
+    expect(
+      printCV(
+        Cl.stringUtf8("\n\u0301\t\u0301\r\u0301\u0000\u0301\u001b\u0301"),
+      ),
+    ).toBe(
+      'u"\\n\\u{301}\\t\\u{301}\\r\\u{301}\\u0000\\u{301}\\u001b\\u{301}"',
+    );
+    expect(printCV(Cl.stringUtf8('"\u0301\\\u0301'))).toBe(
+      'u"\\"\\u{301}\\\\\\u{301}"',
+    );
+    // A literal backslash followed by a letter is not an escape: the mark
+    // sits on a real "n", and on the "5" that follows an escape.
+    expect(printCV(Cl.stringUtf8("\\n\u0301"))).toBe('u"\\\\n\u0301"');
+    expect(printCV(Cl.stringUtf8("\u001b5\u0301"))).toBe('u"\\u001b5\u0301"');
+  });
+
+  it("escapes the same text once, however often it is applied", () => {
+    const once = printCV(
+      Cl.stringUtf8("\n\u0301a\u0301\u200b\u0302\u{1d457}\u0080"),
+    );
+    expect(escapeNonPrintable(once)).toBe(once);
+  });
+
   it("escapes non-ASCII spaces, ignorable and unassigned code points", () => {
     expect(printCV(Cl.stringUtf8("a b\u00a0\u3000"))).toBe(
       'u"a b\\u{a0}\\u{3000}"',

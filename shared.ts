@@ -410,7 +410,9 @@ const mayNeedEscaping =
 /**
  * Escapes non-printable code points as `\u{...}`, keeping newlines and ASCII
  * spaces. A combining mark is kept only when it follows a visible base
- * character; otherwise it would render on top of a quote or an escape.
+ * character; otherwise it would render on top of a quote or an escape. That
+ * includes the escapes already in `text`, such as the `\n` and `\u001b` that
+ * `Cl.stringify` writes: their last character is not a base character.
  * @param text The text to log.
  * @returns The printable text.
  */
@@ -421,14 +423,27 @@ export const escapeNonPrintable = (text: string): string => {
 
   let printable = "";
   let afterBaseCharacter = false;
+  // Code points left in the backslash escape being read: one after the
+  // backslash (`\n`, `\"`, `\\`), or four more after a `u` (`\u001b`).
+  let escapeLength = 0;
+  let afterBackslash = false;
   for (const c of text) {
+    const inEscape = escapeLength > 0;
+    if (inEscape) {
+      escapeLength = afterBackslash && c === "u" ? 4 : escapeLength - 1;
+      afterBackslash = false;
+    } else if (c === "\\") {
+      escapeLength = 1;
+      afterBackslash = true;
+    }
+
     const escaped: boolean =
       c !== "\n" &&
       c !== " " &&
       (invisibleCodePoint.test(c) ||
         (combiningMark.test(c) && !afterBaseCharacter));
     printable += escaped ? `\\u{${c.codePointAt(0)!.toString(16)}}` : c;
-    afterBaseCharacter = !escaped && baseCharacter.test(c);
+    afterBaseCharacter = !escaped && !inEscape && baseCharacter.test(c);
   }
   return printable;
 };

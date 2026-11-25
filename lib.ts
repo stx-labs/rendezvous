@@ -3,7 +3,7 @@ import type { ContractInterfaceFunction } from "@stacks/clarinet-sdk-wasm";
 import type { ClarityValue } from "@stacks/transactions";
 import fc from "fast-check";
 
-import { argsToCV, functionToArbitrary } from "./shared";
+import { functionToArbitrary } from "./shared";
 import type { EnrichedContractInterfaceFunction } from "./shared.types";
 import {
   buildTraitReferenceMap,
@@ -130,11 +130,12 @@ export const strategyFor = (
     resolvedTraitImplementations,
   );
 
-  if (arbitraries.length === 0) {
-    return fc.constant([]);
-  }
-
-  return fc
-    .tuple(...arbitraries)
-    .map((generated: unknown[]) => argsToCV(fn, generated));
+  // While shrinking, fast-check hands the unchanged arguments back as the same
+  // objects. Copy them so a property that edits its arguments in place does
+  // not see those edits in later runs. This only holds when the strategy is
+  // the property's own arbitrary: nested in `fc.tuple` or `fc.record`,
+  // fast-check reuses the copy while it shrinks the other entries, so such
+  // callers must copy the arguments themselves. `.map` draws no randomness, so
+  // saved seeds still replay.
+  return fc.tuple(...arbitraries).map((args) => structuredClone(args));
 };

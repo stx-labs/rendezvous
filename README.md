@@ -56,6 +56,10 @@ npx rv <path-to-clarinet-project> <contract-name> <type>
 - `--seed` – The seed to use for the replay functionality.
 - `--runs` – The number of test iterations to use for exercising the contracts.
   (default: `100`)
+- `--coverage` – Report line and branch coverage (opt-in); see the
+  [coverage reference](docs/chapter_6.md).
+- `--coverage-json` – Save coverage totals and a timed coverage curve.
+- `--coverage-lcov` – Save merged line and branch LCOV.
 - `--regr` – Run regression tests only (replay saved failures).
 - `--bail` – Stop after the first failure.
 - `--fail-on-unchecked` – Fail the run (exit code 1) if a test or invariant was

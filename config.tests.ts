@@ -95,6 +95,51 @@ describe("Config loading and validation", () => {
     expect(unknownKeys).toEqual([]);
   });
 
+  it("validates opt-in coverage outputs", () => {
+    const filePath = createTempConfigFile(
+      "coverage",
+      JSON.stringify({
+        coverage: true,
+        coverage_json: "curve.json",
+        coverage_lcov: "out.lcov",
+      }),
+    );
+    expect(loadConfig(filePath)).toEqual({
+      config: {
+        coverage: true,
+        coverage_json: "curve.json",
+        coverage_lcov: "out.lcov",
+      },
+      unknownKeys: [],
+    });
+  });
+
+  it.each([
+    [{ coverage: "true" }, '"coverage" must be a boolean.'],
+    [
+      { coverage: true, coverage_json: 1 },
+      '"coverage_json" must be a non-empty string.',
+    ],
+    [
+      { coverage: true, coverage_lcov: "" },
+      '"coverage_lcov" must be a non-empty string.',
+    ],
+    [
+      { coverage_json: "curve.json" },
+      "Coverage outputs require coverage: true.",
+    ],
+    [
+      { coverage: false, coverage_lcov: "coverage.lcov" },
+      "Coverage outputs require coverage: true.",
+    ],
+  ])("rejects invalid coverage config %p", (config, message) => {
+    const filePath = createTempConfigFile(
+      "invalid-coverage",
+      JSON.stringify(config),
+    );
+    expect(() => loadConfig(filePath)).toThrow(message);
+  });
+
   it("reports unrecognized keys", () => {
     // Arrange
     const filePath = createTempConfigFile(

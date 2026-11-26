@@ -204,6 +204,24 @@ describe("CLI parsing with parseCli", () => {
     ).toThrow(`"runs" must be a positive integer.`);
   });
 
+  it.each(["1e3", "1foo", "1.5", "", " 1", "1 "])(
+    "rejects non-integer CLI values such as %j",
+    (value) => {
+      expect(() =>
+        parseCli(["./example", "counter", "test", `--runs=${value}`]),
+      ).toThrow(`"runs" must be a positive integer.`);
+      expect(() =>
+        parseCli(["./example", "counter", "test", `--seed=${value}`]),
+      ).toThrow(`"seed" must be an integer.`);
+    },
+  );
+
+  it("accepts signed integer seeds", () => {
+    expect(parseCli(["./example", "counter", "test", "--seed=-17"])?.seed).toBe(
+      -17,
+    );
+  });
+
   it("defaults accountsMode to overwrite when not specified", () => {
     const config = parseCli(["./example", "counter", "test"])!;
     expect(config.accountsMode).toBe("overwrite");
